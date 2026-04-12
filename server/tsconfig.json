@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node", "express", "cors", "morgan", "multer", "jsonwebtoken", "bcryptjs", "pg", "crypto-js", "nodemailer"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "drizzle.config.ts"]
+}
