@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Linking } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Trash2, FileText, Eye } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
@@ -39,6 +40,7 @@ export const useBillQueries = () => {
 
 export default function BillHistory() {
   const toast = useToast();
+  const navigation = useNavigation<any>();
   const { query, remove, bulkRemove } = useBillQueries();
   const all = query.data || [];
   const isLoading = query.isLoading;
@@ -102,7 +104,12 @@ export default function BillHistory() {
   );
 
   return (
-    <MasterScreenLayout title="Bill History" subtitle="All generated invoices">
+    <MasterScreenLayout 
+      title="Bill History" 
+      subtitle="All generated invoices" 
+      onAddNew={() => navigation.navigate('CreateBill')}
+      addNewLabel="Create Bill"
+    >
       <AdaptiveTable data={data} columns={columns} loading={isLoading} emptyText="No invoices found"
         searchValue={search} onSearchChange={setSearch}
         filters={[{ key: 'payment', label: 'Payment', options: [{ label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Card', value: 'card' }] }]}

@@ -12,6 +12,15 @@ import { useToast } from "../hooks/useToast";
 import Voice from '@react-native-voice/voice';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "../api/api";
+
+interface Product {
+  id: string;
+  name: string;
+  sellingPrice: string;
+  mrp: string;
+}
 
 interface CartItem {
   id: string;
@@ -21,24 +30,25 @@ interface CartItem {
   total: number;
 }
 
-const sampleProducts = [
-  { name: "Flower Pots Small", price: 60 },
-  { name: "Classic Laxmi Bomb", price: 25 },
-  { name: "Sparkler Pack 10", price: 150 },
-  { name: "Sky Shot 30", price: 500 },
-  { name: "Ground Chakra", price: 80 },
-];
-
 // Slice-like hook for Billing operations
 export const useCreateBillQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const productsQuery = useQuery<Product[]>({ queryKey: ['products-active'], queryFn: async () => { const { data } = await api.get('/products?limit=999999&isActive=true'); return data.data?.data ?? []; } });
+  const productsQuery = useQuery<Product[]>({ 
+    queryKey: ['products-active'], 
+    queryFn: async () => { 
+      const { data } = await api.get('/products?limit=999999&isActive=true'); 
+      return data.data?.data ?? data.data ?? []; 
+    } 
+  });
 
   const saveMutation = useMutation({
     mutationFn: (payload: any) => api.post('/invoices', payload),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); toast.success('Bill generated successfully!'); },
+    onSuccess: () => { 
+      qc.invalidateQueries({ queryKey: ['invoices'] }); 
+      toast.success('Bill generated successfully!'); 
+    },
     onError: (e) => toast.apiError(e, 'Failed to generate bill'),
   });
 
@@ -106,12 +116,20 @@ export default function CreateBill() {
     }
   };
 
-  const addProduct = (product: any) => {
-    const existing = cart.find((c) => c.productName === product.name);
+  const addProduct = (product: Product) => {
+    const existing = cart.find((c) => c.id === product.id);
+    const itemPrice = parseFloat(product.sellingPrice) || 0;
+    
     if (existing) {
-      setCart(cart.map((c) => c.productName === product.name ? { ...c, qty: c.qty + 1, total: (c.qty + 1) * c.price } : c));
+      setCart(cart.map((c) => c.id === product.id ? { ...c, qty: c.qty + 1, total: (c.qty + 1) * c.price } : c));
     } else {
-      setCart([...cart, { id: product.id || String(Date.now()), productName: product.name, qty: 1, price: product.price, total: product.price }]);
+      setCart([...cart, { 
+        id: product.id, 
+        productName: product.name, 
+        qty: 1, 
+        price: itemPrice, 
+        total: itemPrice 
+      }]);
     }
     setShowProductSelect(false);
   };
@@ -127,7 +145,7 @@ export default function CreateBill() {
   const handleSave = () => {
     if (!customer.phone) { toast.error("Phone number is required"); return; }
     if (cart.length === 0) { toast.error("Add at least one product"); return; }
-    
+
     const payload = {
       customerPhone: customer.phone,
       customerName: customer.name,
@@ -139,7 +157,7 @@ export default function CreateBill() {
       paymentMethod: paymentMethod.toLowerCase(),
       notes,
     };
-    
+
     save.mutate(payload, {
       onSuccess: () => {
         setCart([]);
@@ -263,10 +281,10 @@ export default function CreateBill() {
               </Pressable>
             </View>
             <ScrollView className="max-h-80">
-              {products.map((p: any) => (
+              {products.map((p: Product) => (
                 <Pressable key={p.id} onPress={() => addProduct(p)} className="p-4 border-b border-border/50 active:bg-primary/5">
                   <Text className="font-bold text-foreground" style={{ fontFamily: Fonts.body }}>{p.name}</Text>
-                  <Text className="text-xs text-primary font-semibold mt-0.5">₹{p.price}</Text>
+                  <Text className="text-xs text-primary font-semibold mt-0.5">₹{parseFloat(p.sellingPrice).toFixed(2)}</Text>
                 </Pressable>
               ))}
               {products.length === 0 && !isLoading && (
