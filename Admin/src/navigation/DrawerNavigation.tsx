@@ -32,10 +32,10 @@ export const DrawerNavigation = () => {
       <Drawer.Screen name="UOM" component={Screens.UOM} />
       <Drawer.Screen name="Products" component={Screens.Products} />
       <Drawer.Screen name="Tags" component={Screens.Tags} />
-      <Drawer.Screen name="Media" component={Screens.Media} />
-      <Drawer.Screen name='Videos' component={Screens.Video} />
       <Drawer.Screen name="Roles" component={RoleStack} />
       <Drawer.Screen name="Users" component={Screens.Users} />
+      <Drawer.Screen name="Media" component={Screens.Media} />
+      <Drawer.Screen name='Videos' component={Screens.Video} />
       <Drawer.Screen name="Settings" component={Screens.Settings} />
     </Drawer.Navigator>
   );

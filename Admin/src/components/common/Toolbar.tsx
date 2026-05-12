@@ -127,6 +127,9 @@ export const Toolbar = ({
           </View>
         </View>
 
+      </View>
+
+      <View className="flex-row items-end gap-2 flex-wrap">
         {perPage && onPerPageChange && (
           <View style={{ width: isMobile ? 72 : 96 }}>
             <Select
@@ -137,9 +140,6 @@ export const Toolbar = ({
             />
           </View>
         )}
-      </View>
-
-      <View className="flex-row items-center gap-2 flex-wrap">
         {selectedCount > 0 && onBulkDelete && (
           <TouchableOpacity
             onPress={onBulkDelete}
@@ -157,7 +157,7 @@ export const Toolbar = ({
               className="flex-row items-center gap-1.5 bg-white border border-border rounded-xl px-3 h-10"
             >
               <Download size={15} color="#111827" />
-              {!isMobile && <Text className="text-xs font-semibold text-foreground">Export</Text>}
+              <Text className="text-xs font-semibold text-foreground">Export</Text>
               <ChevronDown size={12} color="#64748b" />
             </TouchableOpacity>
 
@@ -230,7 +230,7 @@ export const Toolbar = ({
             className="flex-row items-center gap-1.5 bg-white border border-border rounded-xl px-3 h-10"
           >
             <Upload size={15} color="#111827" />
-            {!isMobile && <Text className="text-xs font-semibold text-foreground">Import</Text>}
+            <Text className="text-xs font-semibold text-foreground">Import</Text>
           </TouchableOpacity>
         )}
 

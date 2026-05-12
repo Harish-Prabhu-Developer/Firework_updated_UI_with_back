@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform, StatusBar } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePermissions } from '../hooks/usePermissions';
@@ -71,8 +71,9 @@ export const SidebarMenu = (props: any) => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 0, paddingBottom: insets.bottom }]}>
       {/* Brand */}
+
       <View style={[styles.brand, isCollapsed && styles.brandCollapsed]}>
         <View style={styles.logo}>
           <Text style={styles.logoText}>C</Text>
@@ -97,21 +98,29 @@ export const SidebarMenu = (props: any) => {
               key={item.name}
               onPress={() => navigation.navigate(item.route)}
               style={({ pressed }) => [
-                styles.menuItem,
                 isActive && styles.menuItemActive,
                 pressed && styles.menuItemPressed,
                 isCollapsed && styles.menuItemCollapsed
               ]}
             >
-              <item.icon
-                size={20}
-                color={isActive ? colors.sidebarPrimary : 'rgba(255,255,255,0.6)'}
-              />
-              {!isCollapsed && (
-                <Text style={[styles.menuLabel, isActive && styles.menuLabelActive]}>
-                  {item.name}
-                </Text>
-              )}
+              <View style={styles.menuItem}>
+                <View style={[styles.menuIconContainer, isCollapsed && { marginRight: 0 }]}>
+                  <item.icon
+                    size={20}
+                    color={isActive ? colors.sidebarPrimary : 'rgba(255,255,255,0.6)'}
+                  />
+                </View>
+                {!isCollapsed && (
+                  <View style={styles.menuLabelContainer}>
+                    <Text
+                      style={[styles.menuLabel, isActive && styles.menuLabelActive]}
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </Pressable>
           );
         })}
@@ -135,13 +144,16 @@ export const SidebarMenu = (props: any) => {
         <Pressable
           onPress={handleLogout}
           style={({ pressed }) => [
-            styles.logoutItem,
             pressed && styles.menuItemPressed,
             isCollapsed && styles.menuItemCollapsed
           ]}
         >
-          <LogOut size={20} color={colors.destructive} />
-          {!isCollapsed && <Text style={[styles.logoutLabel, { color: colors.destructive }]}>Sign Out</Text>}
+          <View style={styles.menuItem}>
+            <View style={[styles.menuIconContainer, isCollapsed && { marginRight: 0 }]}>
+              <LogOut size={20} color={colors.destructive} />
+            </View>
+            {!isCollapsed && <Text style={[styles.logoutLabel, { color: colors.destructive }]}>Sign Out</Text>}
+          </View>
         </Pressable>
       </View>
     </View>
@@ -157,7 +169,6 @@ const styles = StyleSheet.create({
     padding: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   brandCollapsed: {
     paddingHorizontal: 0,
@@ -170,6 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.sidebarPrimary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   logoText: {
     color: colors.sidebarBackground,
@@ -201,7 +213,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     marginBottom: 20,
-    gap: 12,
   },
   userAvatar: {
     width: 40,
@@ -212,6 +223,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
+    marginRight: 12,
   },
   userAvatarText: {
     color: 'white',
@@ -242,7 +254,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: Radius.lg,
     marginBottom: 4,
-    gap: 12,
+  },
+  menuIconContainer: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  menuLabelContainer: {
+    flex: 1,
   },
   menuItemCollapsed: {
     paddingHorizontal: 0,
@@ -275,7 +296,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: Radius.lg,
-    gap: 12,
   },
   logoutLabel: {
     color: 'rgba(255,255,255,0.6)',

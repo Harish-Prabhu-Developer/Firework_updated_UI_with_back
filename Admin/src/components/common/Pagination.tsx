@@ -52,8 +52,8 @@ export const Pagination = ({ page, totalPages, total, perPage, onPageChange }: P
       style={{
         marginTop: !isDesktop ? 0 : 16,
         ...(((Platform.OS === 'web' && !isDesktop) || Platform.OS === 'android') ? {
-          position: (Platform.OS === 'web' ? 'st' : 'absolute') as any,
-          bottom: Platform.OS === 'web' ? 40 : 25,
+          position: 'absolute',
+          bottom: 40,
           left: 20,
           right: 20,
           zIndex: 999,

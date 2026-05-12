@@ -121,26 +121,26 @@ export const AdaptiveTable = <T extends Record<string, any>>({
           />
         </View>
       ) : (
-        <View className="px-1">
-          <CardView
-            data={paged}
-            selectedIds={selectedIds}
-            onSelectRow={onSelectRow}
-            idKey={idKey}
-            loading={loading}
-            emptyText={emptyText}
-            renderCard={renderCard ?? defaultRenderCard}
-          />
-        </View>
+        <CardView
+          data={paged}
+          selectedIds={selectedIds}
+          onSelectRow={onSelectRow}
+          idKey={idKey}
+          loading={loading}
+          emptyText={emptyText}
+          renderCard={renderCard ?? defaultRenderCard}
+        />
       )}
 
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={safeData.length}
-        perPage={perPage === 999999 ? safeData.length : perPage}
-        onPageChange={setPage}
-      />
-    </View>
+      <View style={{ position: 'static', bottom: 10, width: '100%', flex: 1 }}>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={safeData.length}
+          perPage={perPage === 999999 ? safeData.length : perPage}
+          onPageChange={setPage}
+        />
+      </View>
+    </View >
   );
 };

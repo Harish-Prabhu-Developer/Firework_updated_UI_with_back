@@ -49,65 +49,30 @@ export const MasterScreenLayout = ({
   const bottomPadding = isMobile ? 40 : 48;
 
   const header = (
-    <View
-      className={`${isMobile ? 'flex-col' : 'flex-row'} items-start justify-between`}
-      style={{ marginBottom: isMobile ? 24 : 32, gap: isMobile ? 16 : 24 }}
-    >
-      <View style={{ flex: isMobile ? undefined : 1, width: isMobile ? '100%' : 'auto' }}>
-        <View className="flex-row items-center mb-1">
-          {/* Breadcrumb style indicator could go here if needed */}
-        </View>
-        <Text
-          style={{
-            color: colors.foreground,
-            fontFamily: Fonts.display,
-            fontSize: isNarrow ? 24 : isMobile ? 28 : 32,
-            fontWeight: '900',
-            letterSpacing: -0.5,
-          }}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text
-            style={{
-              color: colors.mutedForeground,
-              fontFamily: Fonts.body,
-              fontSize: isNarrow ? 13 : 14,
-              marginTop: 4,
-            }}
-          >
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-
-      <View
-        className="flex-row items-center"
-        style={{
-          gap: 12,
-          width: isMobile ? '100%' : 'auto',
-          justifyContent: isMobile ? 'flex-start' : 'flex-end',
-          flexWrap: 'wrap'
+    <View style={{ marginBottom: isMobile ? 24 : 32 }}>
+      {/* Title & Add Button Row */}
+      <View 
+        style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          gap: 12
         }}
       >
-        {extraHeaderContent}
-        {onExport && (
-          <TouchableOpacity
-            onPress={onExport}
-            activeOpacity={0.7}
-            className="flex-row items-center justify-center bg-white px-5 h-11 border border-border"
+        <View style={{ flex: 1 }}>
+          <Text
             style={{
-              borderRadius: Radius.lg,
-              minWidth: isMobile ? 100 : 120,
+              color: colors.foreground,
+              fontFamily: Fonts.display,
+              fontSize: isNarrow ? 24 : isMobile ? 28 : 32,
+              fontWeight: '900',
+              letterSpacing: -0.5,
             }}
           >
-            <Download size={18} color={iconColors.mutedForeground} strokeWidth={2} />
-            <Text style={{ color: colors.mutedForeground, fontSize: 14, fontWeight: '700', marginLeft: 8, fontFamily: Fonts.body }}>
-              {exportLabel}
-            </Text>
-          </TouchableOpacity>
-        )}
+            {title}
+          </Text>
+        </View>
+
         {onAddNew ? (
           <TouchableOpacity
             onPress={onAddNew}
@@ -115,7 +80,7 @@ export const MasterScreenLayout = ({
             className="flex-row items-center justify-center bg-primary px-5 h-11"
             style={{
               borderRadius: Radius.lg,
-              minWidth: isMobile ? 140 : 160,
+              minWidth: isMobile ? 120 : 160,
               shadowColor: colors.primary,
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.2,
@@ -124,12 +89,58 @@ export const MasterScreenLayout = ({
             }}
           >
             <Plus size={18} color={iconColors.primaryForeground} strokeWidth={2.5} />
-            <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: '800', marginLeft: 8, fontFamily: Fonts.body }}>
+            <Text style={{ color: iconColors.primaryForeground, fontSize: 13, fontWeight: '800', marginLeft: 6, fontFamily: Fonts.body }}>
               {addNewLabel.toUpperCase()}
             </Text>
           </TouchableOpacity>
         ) : null}
       </View>
+
+      {/* Subtitle */}
+      {subtitle ? (
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontFamily: Fonts.body,
+            fontSize: isNarrow ? 13 : 14,
+            marginTop: 4,
+          }}
+        >
+          {subtitle}
+        </Text>
+      ) : null}
+
+      {/* Extra Header Content (Filters, Export, etc.) */}
+      {(extraHeaderContent || onExport) && (
+        <View
+          className="flex-row items-center"
+          style={{
+            gap: 12,
+            width: '100%',
+            justifyContent: 'flex-start',
+            flexWrap: 'wrap',
+            marginTop: 16
+          }}
+        >
+          {extraHeaderContent}
+          {onExport && (
+            <TouchableOpacity
+              onPress={onExport}
+              activeOpacity={0.7}
+              className="flex-row items-center justify-center bg-white px-5 h-11 border border-border"
+              style={{
+                borderRadius: Radius.lg,
+                minWidth: isMobile ? 100 : 120,
+              }}
+            >
+              <Download size={18} color={iconColors.mutedForeground} strokeWidth={2} />
+              <Text style={{ color: colors.mutedForeground, fontSize: 14, fontWeight: '700', marginLeft: 8, fontFamily: Fonts.body }}>
+                {exportLabel}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 

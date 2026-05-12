@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, Image, StatusBar } from 'react-native';
 import { Menu, Bell, User } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { Fonts, Radius } from '../styles/globalStyles';
@@ -15,6 +15,7 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+
       <View style={styles.left}>
         <Pressable onPress={onMenuPress} style={styles.iconButton}>
           <Menu size={24} color={colors.foreground} />
@@ -41,7 +42,7 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
 
 const styles = StyleSheet.create({
   container: {
-    height: Platform.OS === "android" ? 100 : 64,
+    height: Platform.OS === "android" ? 95 : 64,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
