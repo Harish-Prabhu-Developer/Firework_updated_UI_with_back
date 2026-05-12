@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { ChevronLeft, ScanLine, Info, ShieldAlert } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LightColors as colors } from '../styles/colors';
+import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
 
 // Dynamic import for Native Camera — Webpack alias handles web stub automatically
 // See: webpack.config.js → resolve.alias → 'react-native-camera-kit'
@@ -159,11 +161,12 @@ export default function QrScan({ navigation, route }: any) {
       <View className="h-16 flex-row items-center px-4 bg-slate-950 border-b border-white/10">
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          className="h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10"
+          style={{ borderRadius: Radius.xl }}
+          className="h-10 w-10 items-center justify-center bg-white/5 border border-white/10"
         >
           <ChevronLeft size={24} color="white" />
         </TouchableOpacity>
-        <Text className="ml-4 text-white text-lg font-black tracking-tight uppercase">Scan Order ID</Text>
+        <Text style={{ fontFamily: Fonts.display }} className="ml-4 text-white text-lg font-black tracking-tight uppercase">Scan Order ID</Text>
       </View>
 
       <View style={styles.scannerWrapper}>
@@ -173,8 +176,8 @@ export default function QrScan({ navigation, route }: any) {
             <div id="qr-reader" style={{ width: '100%', height: '100%', background: '#020617' }} />
             {!isWebReady && (
               <View className="flex-1 items-center justify-center gap-4">
-                <ActivityIndicator color="#4f46e5" size="large" />
-                <Text className="text-white/60 font-medium">Initializing Optical Sensors...</Text>
+                <ActivityIndicator color={colors.primary} size="large" />
+                <Text style={{ fontFamily: Fonts.body }} className="text-white/60 font-medium">Initializing Optical Sensors...</Text>
               </View>
             )}
           </View>
@@ -193,7 +196,7 @@ export default function QrScan({ navigation, route }: any) {
               />
             ) : (
               <View className="flex-1 items-center justify-center">
-                <ActivityIndicator color="#6366f1" size="large" />
+                <ActivityIndicator color={colors.primary} size="large" />
               </View>
             )}
           </View>
@@ -206,16 +209,16 @@ export default function QrScan({ navigation, route }: any) {
             <View style={styles.sideDim} />
             <View style={styles.focusFrame}>
               {/* Corner Brackets - Thick Industrial Style */}
-              <View className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 rounded-tl-2xl" />
-              <View className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-indigo-500 rounded-tr-2xl" />
-              <View className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-500 rounded-bl-2xl" />
-              <View className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-500 rounded-br-2xl" />
+              <View style={{ borderColor: colors.primary, borderTopLeftRadius: Radius['2xl'] }} className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4" />
+              <View style={{ borderColor: colors.primary, borderTopRightRadius: Radius['2xl'] }} className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4" />
+              <View style={{ borderColor: colors.primary, borderBottomLeftRadius: Radius['2xl'] }} className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4" />
+              <View style={{ borderColor: colors.primary, borderBottomRightRadius: Radius['2xl'] }} className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4" />
 
               {/* Laser Animation */}
               <Animated.View
                 style={[
                   styles.laser,
-                  { transform: [{ translateY }] }
+                  { transform: [{ translateY }], backgroundColor: colors.primary, shadowColor: colors.primary }
                 ]}
               />
             </View>
@@ -223,14 +226,14 @@ export default function QrScan({ navigation, route }: any) {
           </View>
           <View style={[styles.bottomDim, { flex: 1.5 }]}>
             <View className="mt-12 items-center px-8">
-              <View className="bg-white/10 px-4 py-3 rounded-2xl border border-white/10 flex-row items-center gap-3">
-                <ScanLine size={20} color="#818cf8" />
-                <Text className="text-white text-sm font-bold">Align QR Code within the frame</Text>
+              <View style={{ borderRadius: Radius['2xl'], borderColor: 'rgba(255,255,255,0.1)' }} className="bg-white/10 px-4 py-3 border flex-row items-center gap-3">
+                <ScanLine size={20} color={colors.primary} />
+                <Text style={{ fontFamily: Fonts.body }} className="text-white text-sm font-bold">Align QR Code within the frame</Text>
               </View>
 
               <View className="mt-6 flex-row items-center gap-2 opacity-60">
                 <Info size={14} color="white" />
-                <Text className="text-white text-[11px] font-medium tracking-wide uppercase">Decodes Order Manifests</Text>
+                <Text style={{ fontFamily: Fonts.body }} className="text-white text-[11px] font-medium tracking-wide uppercase">Decodes Order Manifests</Text>
               </View>
             </View>
           </View>
@@ -238,16 +241,17 @@ export default function QrScan({ navigation, route }: any) {
 
         {!hasPermission && Platform.OS !== 'web' && (
           <View className="flex-1 items-center justify-center px-12 gap-4">
-            <View className="h-16 w-16 rounded-full bg-red-500/10 items-center justify-center border border-red-500/20">
-              <ShieldAlert size={32} color="#ef4444" />
+            <View style={{ borderColor: 'rgba(239,68,68,0.2)' }} className="h-16 w-16 rounded-full bg-red-500/10 items-center justify-center border">
+              <ShieldAlert size={32} color={colors.destructive} />
             </View>
-            <Text className="text-white text-center font-bold text-lg">Camera Access Required</Text>
-            <Text className="text-white/60 text-center text-sm">Please enable camera permissions in your device settings to scan orders.</Text>
+            <Text style={{ fontFamily: Fonts.display }} className="text-white text-center font-bold text-lg">Camera Access Required</Text>
+            <Text style={{ fontFamily: Fonts.body }} className="text-white/60 text-center text-sm">Please enable camera permissions in your device settings to scan orders.</Text>
             <TouchableOpacity
               onPress={requestCameraPermission}
-              className="mt-4 bg-indigo-600 px-8 py-3 rounded-xl"
+              style={{ borderRadius: Radius.xl, backgroundColor: colors.primary }}
+              className="mt-4 px-8 py-3"
             >
-              <Text className="text-white font-bold">Grant Permission</Text>
+              <Text style={{ fontFamily: Fonts.body }} className="text-white font-bold">Grant Permission</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -282,11 +286,10 @@ const styles = StyleSheet.create({
   laser: {
     height: 3,
     width: '100%',
-    backgroundColor: '#6366f1',
-    shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 10,
     elevation: 10,
   },
 });
+

@@ -1,0 +1,36 @@
+import { Router, type Router as ExpressRouter } from 'express';
+import authRoutes from './authRoutes.js';
+import categoryRoutes from './categoryRoutes.js';
+import productRoutes from './productRoutes.js';
+import uomRoutes from './uomRoutes.js';
+import videoRoutes from './videoRoutes.js';
+import userRoutes from './userRoutes.js';
+import tagRoutes from './tagRoutes.js';
+import customerRoutes from './customerRoutes.js';
+import orderRoutes from './orderRoutes.js';
+import invoiceRoutes from './invoiceRoutes.js';
+import roleRoutes from './roleRoutes.js';
+import settingRoutes from './settingRoutes.js';
+import uploadRoutes from './uploadRoutes.js';
+import bannerRoutes from './bannerRoutes.js';
+// import mediaRoutes from './mediaRoutes.js';
+
+const router: ExpressRouter = Router();
+
+router.use('/auth', authRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/products', productRoutes);
+router.use('/uoms', uomRoutes);
+router.use('/videos', videoRoutes);
+router.use('/users', userRoutes);
+router.use('/tags', tagRoutes);
+router.use('/customers', customerRoutes);
+router.use('/orders', orderRoutes);
+router.use('/invoices', invoiceRoutes);
+router.use('/roles', roleRoutes);
+router.use('/settings', settingRoutes);
+router.use('/uploads', uploadRoutes);
+router.use('/banners', bannerRoutes);
+// router.use('/media', mediaRoutes);
+
+export default router;

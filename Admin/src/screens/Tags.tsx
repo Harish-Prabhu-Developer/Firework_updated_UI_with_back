@@ -1,252 +1,123 @@
-import React, { useState } from "react";
-import { View, Text } from "react-native";
-import { MasterScreenLayout } from "../components/MasterScreenLayout";
-import { AdaptiveTable, Column } from "../components/AdaptiveTable";
-import { DeleteConfirmModal } from "../components/DeleteConfirmModal";
-import { StatusBadge } from "../components/StatusBadge";
-import { PermissionGuard, usePermissions } from "../hooks/usePermissions";
-import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
-import { Select } from "../components/ui/Select";
-import { Dialog } from "../components/ui/Dialog";
-import { Pencil, Trash2, Palette } from "lucide-react-native";
-import { ScrollView } from "react-native";
+import React, { useState, useMemo } from 'react';
+import { View, Text, TouchableOpacity, Switch, Platform } from 'react-native';
+import { Pencil, Trash2, Tags as TagsIcon } from 'lucide-react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
+import { AdaptiveTable } from '../components/AdaptiveTable';
+import { FormModal } from '../components/modals/FormModal';
+import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
+import { StatusBadge } from '../components/common/StatusBadge';
+import { Column } from '../components/table/TableView';
+import { useToast } from '../hooks/useToast';
+import api from '../api/api';
+import { Input } from '../components/ui/Input';
+import { LightColors as colors } from '../styles/colors';
+import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
 
-interface Tag { id: string; name: string; slug: string; color: string; status: string; }
+interface Tag { id: string; name: string; slug: string; color?: string; rank: number; showLimit: number; isActive: boolean; }
 
-const initialData: Tag[] = [
-  { id: "1", name: "Diwali Special", slug: "diwali-special", color: "#f59e0b", status: "Active" },
-  { id: "2", name: "New Arrival", slug: "new-arrival", color: "#3b82f6", status: "Active" },
-  { id: "3", name: "Best Seller", slug: "best-seller", color: "#ef4444", status: "Inactive" },
-];
+// Slice-like hook for Tag operations
+export const useTagQueries = () => {
+  const qc = useQueryClient();
+  const toast = useToast();
 
-const MODULE = "Tags";
+  const query = useQuery({ queryKey: ['tags'], queryFn: async () => { const { data } = await api.get('/tags'); return data.data ?? []; } });
+
+  const saveMutation = useMutation({
+    mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/tags/${id}`, payload) : api.post('/tags', payload),
+    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['tags'] }); toast.success(variables.id ? 'Tag updated' : 'Tag created'); },
+    onError: (e) => toast.apiError(e, 'Failed'),
+  });
+
+  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/tags/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); toast.success('Deleted'); } });
+  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.delete('/tags/bulk', { data: { ids } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); toast.success('Deleted'); } });
+
+  return { query, save: saveMutation, remove: deleteMutation, bulkRemove: bulkDeleteMutation };
+};
 
 export default function Tags() {
-  const { hasPermission } = usePermissions();
-  const [data, setData] = useState(initialData);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editItem, setEditItem] = useState<Tag | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<Tag>>({});
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const { query, save, remove, bulkRemove } = useTagQueries();
+  const all = query.data || [];
+  const isLoading = query.isLoading;
 
-  const filteredData = data.filter((item) => statusFilter === "all" || item.status === statusFilter);
+  const [search, setSearch] = useState(''); const [filterActive, setFilterActive] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set<string>());
+  const [formOpen, setFormOpen] = useState(false); const [editItem, setEditItem] = useState<Tag | null>(null);
+  const [form, setForm] = useState({ name: '', color: colors.primary, rank: '0', showLimit: '0', isActive: true });
+  const [deleteId, setDeleteId] = useState<string | null>(null); const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const openForm = (item?: Tag) => {
-    setEditItem(item || null);
-    setForm(item || { status: "Active", color: "#cccccc" });
-    setFormOpen(true);
-  };
+  const data = useMemo(() => {
+    let d = all as Tag[];
+    if (search) d = d.filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
+    if (filterActive) d = d.filter(t => String(t.isActive) === filterActive);
+    return d;
+  }, [all, search, filterActive]);
 
-  const handleToggleAll = () => {
-    setSelectedIds(selectedIds.length === filteredData.length ? [] : filteredData.map(i => i.id));
-  };
+  const openAdd = () => { setEditItem(null); setForm({ name: '', color: colors.primary, rank: '0', showLimit: '0', isActive: true }); setFormOpen(true); };
+  const openEdit = (t: Tag) => { setEditItem(t); setForm({ name: t.name, color: t.color ?? colors.primary, rank: String(t.rank), showLimit: String(t.showLimit), isActive: t.isActive }); setFormOpen(true); };
+  const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const handleSubmit = () => {
-    if (!form.name) return;
-    if (editItem) {
-      setData(data.map((i) => i.id === editItem.id ? { ...i, ...form } as Tag : i));
-    } else {
-      setData([...data, { ...form, id: String(Date.now()) } as Tag]);
-    }
-    setFormOpen(false);
-  };
+  const TagPill = ({ tag }: { tag: Tag }) => (
+    <View style={{ backgroundColor: (tag.color ?? colors.primary) + '15', borderColor: tag.color ?? colors.primary, borderWidth: 1 }} className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full self-start">
+      <View style={{ backgroundColor: tag.color ?? colors.primary }} className="w-1.5 h-1.5 rounded-full" />
+      <Text style={{ color: tag.color ?? colors.primary, fontFamily: Fonts.body }} className="text-[10px] font-black uppercase tracking-wide">{tag.name}</Text>
+    </View>
+  );
 
   const columns: Column<Tag>[] = [
-    {
-      key: "color",
-      label: "Color",
-      render: (i) => (
-        <View className="flex-row items-center gap-2">
-          <View className="h-6 w-6 rounded-full border border-border" style={{ backgroundColor: i.color || "#ccc" }} />
-          <Text className="text-[10px] text-muted-foreground font-mono uppercase">{i.color}</Text>
-        </View>
-      )
-    },
-    { key: "name", label: "Tag Name", sortable: true },
-    { key: "slug", label: "Slug", mobileHide: true },
-    { key: "status", label: "Status", render: (i) => <StatusBadge status={i.status} /> },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (i) => (
-        <View className="flex-row gap-2">
-          <PermissionGuard module={MODULE} action="Update">
-            <Button variant="ghost" size="icon" onPress={() => openForm(i)}>
-              <Pencil size={18} color="#4f46e5" />
-            </Button>
-          </PermissionGuard>
-          <PermissionGuard module={MODULE} action="Delete">
-            <Button variant="ghost" size="icon" onPress={() => setDeleteId(i.id)}>
-              <Trash2 size={18} color="#ef4444" />
-            </Button>
-          </PermissionGuard>
-        </View>
-      )
-    },
+    { key: 'name', label: 'Tag', width: 160, render: (t) => <TagPill tag={t} /> },
+    { key: 'slug', label: 'Slug', width: 160, render: (t) => <Text style={{ fontFamily: Fonts.body }} className="text-xs font-mono text-muted-foreground">{t.slug}</Text> },
+    { key: 'rank', label: 'Rank', width: 70, align: 'center', render: (t) => <Text style={{ fontFamily: Fonts.body }} className="font-bold text-center text-foreground">{t.rank}</Text> },
+    { key: 'showLimit', label: 'Show Limit', width: 90, align: 'center', render: (t) => <Text style={{ fontFamily: Fonts.body }} className="font-bold text-center text-foreground">{t.showLimit === 0 ? 'All' : t.showLimit}</Text> },
+    { key: 'isActive', label: 'Status', width: 90, render: (t) => <StatusBadge status={t.isActive ? 'Active' : 'Inactive'} /> },
+    { key: 'actions', label: 'Actions', width: 90, render: (t) => <View className="flex-row gap-1"><TouchableOpacity onPress={() => openEdit(t)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(t.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
   ];
 
-  const handleExport = (format: string) => {
-    console.log(`Exporting ${MODULE} as ${format}`);
-  };
-
-  const handleImport = (importedData: any[]) => {
-    setData([...data, ...importedData.map(i => ({ ...i, id: String(Date.now() + Math.random()) }))]);
-  };
+  const renderCard = (t: Tag, _: boolean) => (
+    <View style={globalStyles.card}>
+      <View className="flex-row items-center justify-between mb-4">
+        <TagPill tag={t} />
+        <StatusBadge status={t.isActive ? 'Active' : 'Inactive'} />
+      </View>
+      <Text style={{ fontFamily: Fonts.body }} className="text-xs font-mono text-muted-foreground mb-4">{t.slug}</Text>
+      <View className="flex-row gap-4 bg-muted p-3 rounded-xl border border-border/40">
+        <View><Text style={{ fontFamily: Fonts.body }} className="text-[9px] font-black text-muted-foreground uppercase mb-0.5">Rank</Text><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-foreground">{t.rank}</Text></View>
+        <View><Text style={{ fontFamily: Fonts.body }} className="text-[9px] font-black text-muted-foreground uppercase mb-0.5">Show Limit</Text><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-foreground">{t.showLimit === 0 ? 'All' : t.showLimit}</Text></View>
+      </View>
+      <View className="flex-row border-t border-border/40 pt-2 mt-4">
+        <TouchableOpacity onPress={() => openEdit(t)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-primary">Edit</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setDeleteId(t.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-destructive">Delete</Text></TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
-    <MasterScreenLayout
-      title="Tags"
-      subtitle="Manage product labels"
-      totalCount={data.length}
-      allSelected={filteredData.length > 0 && selectedIds.length === filteredData.length}
-      onToggleAll={handleToggleAll}
-      onAddNew={() => openForm()}
-      onExport={handleExport}
-      onImport={handleImport}
-      importExpectedColumns={[
-        { key: "name", label: "Tag Name" },
-        { key: "slug", label: "Slug" },
-        { key: "color", label: "Color HEX" },
-        { key: "status", label: "Status" }
-      ]}
-      module={MODULE}
-    >
-      <AdaptiveTable
-        data={filteredData}
-        columns={columns}
-        searchPlaceholder="Search tags..."
-        searchKeys={["name", "slug"]}
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        onBulkDelete={hasPermission(MODULE, "Bulk Delete") ? (ids) => {
-          setData(data.filter((d) => !ids.includes(d.id)));
-          setSelectedIds([]);
-        } : undefined}
-        filterComponent={
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-                options={[
-                  { label: "All Status", value: "all" },
-                  { label: "Active", value: "Active" },
-                  { label: "Inactive", value: "Inactive" },
-                ]}
-                className="h-10"
-              />
-            </View>
-          </View>
-        }
-        renderCardHeader={(i) => (
-          <View className="flex-row items-center gap-3">
-            <View className="h-10 w-10 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: i.color || "#ccc" }} />
-            <View className="flex-1">
-              <Text className="text-lg font-bold text-foreground">{i.name}</Text>
-              <Text className="text-xs text-muted-foreground">{i.slug}</Text>
-            </View>
-          </View>
-        )}
-        renderCardBody={(i) => (
-          <View className="gap-3">
-            <View className="flex-row justify-between items-center bg-muted/50 p-3 rounded-xl border border-border/50">
-              <View>
-                <Text className="text-[10px] text-muted-foreground uppercase font-black mb-0.5">HEX CODE</Text>
-                <Text className="text-sm font-bold text-foreground font-mono uppercase tracking-tighter">{i.color}</Text>
-              </View>
-              <StatusBadge status={i.status} />
-            </View>
-          </View>
-        )}
-        renderCardFooter={(i) => (
-          <View className="flex-row items-center border-t border-border/40 mt-3 pt-0.5">
-            <PermissionGuard module={MODULE} action="Update" className="flex-1 border-r border-border/30">
-              <Button
-                variant="ghost"
-                className="w-full h-12 flex-row items-center justify-center"
-                onPress={() => openForm(i)}
-              >
-                <Pencil size={20} color="#4f46e5" />
-              </Button>
-            </PermissionGuard>
-
-            <PermissionGuard module={MODULE} action="Delete" className="flex-1">
-              <Button
-                variant="ghost"
-                className="w-full h-12 flex-row items-center justify-center"
-                onPress={() => setDeleteId(i.id)}
-              >
-                <Trash2 size={20} color="#ef4444" />
-              </Button>
-            </PermissionGuard>
-          </View>
-        )}
+    <MasterScreenLayout title="Tags" subtitle="Manage product tags" onAddNew={openAdd} addNewLabel="Add Tag">
+      <AdaptiveTable data={data} columns={columns} loading={isLoading} emptyText="No tags found"
+        searchValue={search} onSearchChange={setSearch}
+        filters={[{ key: 'isActive', label: 'Status', options: [{ label: 'Active', value: 'true' }, { label: 'Inactive', value: 'false' }] }]}
+        filterValues={{ isActive: filterActive }} onFilterChange={(k, v) => setFilterActive(v)}
+        selectedIds={selectedIds} onSelectAll={(a) => setSelectedIds(a ? new Set(data.map(d => d.id)) : new Set())}
+        onSelectRow={toggleSelect} onBulkDelete={selectedIds.size > 0 ? () => setBulkDeleteOpen(true) : undefined}
+        exportTitle="Tags Report" exportFilename="tags"
+        renderCard={renderCard}
       />
-
-      <Dialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        title={editItem ? "Edit Tag" : "Add Tag"}
-        footer={
-          <>
-            <Button variant="outline" label="Cancel" onPress={() => setFormOpen(false)} />
-            <Button label="Save" onPress={handleSubmit} />
-          </>
-        }
+      <FormModal open={formOpen} onClose={() => setFormOpen(false)} title={editItem ? 'Edit Tag' : 'Add Tag'}
+        footer={<View className="flex-row gap-3"><TouchableOpacity onPress={() => setFormOpen(false)} className="flex-1 h-11 rounded-xl border border-border items-center justify-center"><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold">Cancel</Text></TouchableOpacity><TouchableOpacity onPress={() => save.mutate({ id: editItem?.id, payload: { ...form, rank: Number(form.rank), showLimit: Number(form.showLimit) } }, { onSuccess: () => setFormOpen(false) })} disabled={save.isPending} className="flex-1 h-11 rounded-xl bg-primary items-center justify-center"><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-primary-foreground">{save.isPending ? 'Saving…' : editItem ? 'Update' : 'Create'}</Text></TouchableOpacity></View>}
       >
-        <ScrollView className="max-h-[70vh]">
-          <View className="gap-5 pb-10 p-1">
-            <Input
-              label="Tag Name *"
-              value={form.name || ""}
-              onChangeText={(v) => {
-                const slug = v.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '');
-                setForm({ ...form, name: v, slug });
-              }}
-              placeholder="e.g. Diwali Special"
-            />
-            <Input
-              label="Slug"
-              value={form.slug || ""}
-              onChangeText={(v) => setForm({ ...form, slug: v })}
-              placeholder="url-friendly-name"
-            />
-
-            <View className="flex-row gap-4 items-end">
-              <View className="flex-1">
-                <Input
-                  label="Accent Color (HEX) *"
-                  value={form.color || ""}
-                  onChangeText={(v) => setForm({ ...form, color: v })}
-                  placeholder="#f59e0b"
-                  leftIcon={<Palette size={16} color="#64748b" />}
-                />
-              </View>
-              <View className="h-12 w-12 rounded-xl border border-border shadow-sm mb-0" style={{ backgroundColor: form.color || "#cccccc" }} />
-            </View>
-
-            <Select
-              label="Status"
-              value={form.status || "Active"}
-              onValueChange={(v) => setForm({ ...form, status: v as any })}
-              options={[
-                { label: "Active", value: "Active" },
-                { label: "Inactive", value: "Inactive" },
-              ]}
-            />
+        <View className="gap-4">
+          <Input label="Tag Name *" value={form.name} onChangeText={v => setForm({ ...form, name: v })} placeholder="e.g. New Arrival" />
+          <Input label="Color (hex)" value={form.color} onChangeText={v => setForm({ ...form, color: v })} placeholder="#6366f1" />
+          <View className="flex-row gap-3">
+            <View className="flex-1"><Input label="Display Rank" value={form.rank} onChangeText={v => setForm({ ...form, rank: v })} keyboardType="numeric" /></View>
+            <View className="flex-1"><Input label="Show Limit (0=All)" value={form.showLimit} onChangeText={v => setForm({ ...form, showLimit: v })} keyboardType="numeric" /></View>
           </View>
-        </ScrollView>
-      </Dialog>
-
-      <DeleteConfirmModal
-        open={!!deleteId}
-        onOpenChange={(v) => !v && setDeleteId(null)}
-        itemName="tag"
-        onConfirm={() => { setData(data.filter((d) => d.id !== deleteId)); setDeleteId(null); }}
-      />
+          <View className="flex-row items-center justify-between py-2"><Text style={{ fontFamily: Fonts.body }} className="text-sm font-semibold text-foreground">Active Status</Text><Switch value={form.isActive} onValueChange={v => setForm({ ...form, isActive: v })} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={Platform.OS === 'ios' ? undefined : form.isActive ? colors.primaryForeground : colors.muted} /></View>
+        </View>
+      </FormModal>
+      <DeleteConfirmModal open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)} itemName="tag" onConfirm={() => deleteId && remove.mutate(deleteId, { onSuccess: () => setDeleteId(null) })} loading={remove.isPending} />
+      <DeleteConfirmModal open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} count={selectedIds.size} itemName="tag" onConfirm={() => bulkRemove.mutate([...selectedIds], { onSuccess: () => { setSelectedIds(new Set()); setBulkDeleteOpen(false); } })} loading={bulkRemove.isPending} />
     </MasterScreenLayout>
   );
 }
+

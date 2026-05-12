@@ -101,6 +101,7 @@ export const products = pgTable(
 
     name: varchar("name", { length: 200 }).notNull(),
     slug: varchar("slug", { length: 220 }).notNull(),
+    description: text("description"),
     image: text("image"),
     images: text("images"),
 

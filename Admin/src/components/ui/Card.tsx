@@ -1,55 +1,32 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { ReactNode } from 'react';
+import { View, ViewProps } from 'react-native';
 import { cn } from '../../lib/utils';
+import { globalStyles, Radius } from '../../styles/globalStyles';
 
-const Card = React.forwardRef<View, React.ComponentPropsWithoutRef<typeof View>>(
-  ({ className, ...props }, ref) => (
-    <View
-      ref={ref}
-      className={cn('rounded-lg border border-border bg-card shadow-sm', className)}
-      {...props}
-    />
-  )
+interface CardProps extends ViewProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export const Card = ({ children, className, style, ...props }: CardProps) => (
+  <View
+    style={[globalStyles.card, { borderRadius: Radius.xl }, style as any]}
+    className={cn('bg-card border border-border overflow-hidden', className)}
+    {...props}
+  >
+    {children}
+  </View>
 );
-Card.displayName = 'Card';
 
-const CardHeader = React.forwardRef<View, React.ComponentPropsWithoutRef<typeof View>>(
-  ({ className, ...props }, ref) => (
-    <View ref={ref} className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />
-  )
+export const CardContent = ({ children, className, ...props }: CardProps) => (
+  <View className={cn('p-4', className)} {...props}>{children}</View>
 );
-CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<Text, React.ComponentPropsWithoutRef<typeof Text>>(
-  ({ className, ...props }, ref) => (
-    <Text
-      ref={ref}
-      className={cn('text-lg font-semibold leading-none tracking-tight text-card-foreground', className)}
-      {...props}
-    />
-  )
+export const CardHeader = ({ children, className, ...props }: CardProps) => (
+  <View className={cn('px-4 py-3 border-b border-border', className)} {...props}>{children}</View>
 );
-CardTitle.displayName = 'CardTitle';
 
-const CardDescription = React.forwardRef<Text, React.ComponentPropsWithoutRef<typeof Text>>(
-  ({ className, ...props }, ref) => (
-    <Text ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
-  )
+export const CardFooter = ({ children, className, ...props }: CardProps) => (
+  <View className={cn('px-4 py-3 border-t border-border bg-muted/20', className)} {...props}>{children}</View>
 );
-CardDescription.displayName = 'CardDescription';
 
-const CardContent = React.forwardRef<View, React.ComponentPropsWithoutRef<typeof View>>(
-  ({ className, ...props }, ref) => (
-    <View ref={ref} className={cn('p-6 pt-0', className)} {...props} />
-  )
-);
-CardContent.displayName = 'CardContent';
-
-const CardFooter = React.forwardRef<View, React.ComponentPropsWithoutRef<typeof View>>(
-  ({ className, ...props }, ref) => (
-    <View ref={ref} className={cn('flex items-center p-6 pt-0', className)} {...props} />
-  )
-);
-CardFooter.displayName = 'CardFooter';
-
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

@@ -1,57 +1,45 @@
 import React from 'react';
-import { TextInput, View, Text } from 'react-native';
+import { View, Text, TextInput, TextInputProps } from 'react-native';
 import { cn } from '../../lib/utils';
+import { LightColors as colors } from '../../styles/colors';
+import { Fonts, Radius } from '../../styles/globalStyles';
 
-export interface InputProps extends React.ComponentPropsWithoutRef<typeof TextInput> {
+interface Props extends TextInputProps {
   label?: string;
+  required?: boolean;
   error?: string;
-  containerClassName?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+  className?: string;
+  textClassName?: string;
 }
 
-const Input = React.forwardRef<TextInput, InputProps>(
-  ({ className, label, error, containerClassName, leftIcon, rightIcon, ...props }, ref) => {
-    return (
-      <View className={cn('w-full flex flex-col gap-1.5', containerClassName)}>
-        {label && (
-          <Text className="text-sm font-medium text-foreground ml-1">
-            {label}
-          </Text>
-        )}
-        <View className="relative flex-row items-center">
-          {leftIcon && (
-            <View className="absolute left-3 z-10">
-              {leftIcon}
-            </View>
-          )}
-          <TextInput
-            ref={ref}
-            className={cn(
-              'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-ring disabled:opacity-50',
-              leftIcon && 'pl-10',
-              rightIcon && 'pr-10',
-              error && 'border-destructive',
-              className
-            )}
-            placeholderTextColor="#94a3b8" // slate-400
-            {...props}
-          />
-          {rightIcon && (
-            <View className="absolute right-3 z-10">
-              {rightIcon}
-            </View>
-          )}
-        </View>
-        {error && (
-          <Text className="text-xs font-medium text-destructive ml-1">
-            {error}
-          </Text>
-        )}
-      </View>
-    );
-  }
+export const Input = ({ label, required, error, className, textClassName, style, ...props }: Props) => (
+  <View>
+    {label && (
+      <Text 
+        style={{ fontFamily: Fonts.body }}
+        className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5"
+      >
+        {label} {required && <Text className="text-destructive">*</Text>}
+      </Text>
+    )}
+    <TextInput
+      style={[{ outline: 'none', borderRadius: Radius.xl, fontFamily: Fonts.body }, style as any]}
+      className={cn(
+        'bg-card border px-3.5 py-2.5 text-sm text-foreground',
+        error ? 'border-destructive' : 'border-border',
+        props.multiline ? 'min-h-[80px] py-3' : 'h-11',
+        className,
+        textClassName
+      )}
+      placeholderTextColor={colors.mutedForeground}
+      textAlignVertical={props.multiline ? 'top' : 'center'}
+      {...props}
+    />
+    {error && (
+      <Text style={{ fontFamily: Fonts.body }} className="text-xs text-destructive font-medium mt-1">
+        {error}
+      </Text>
+    )}
+  </View>
 );
-Input.displayName = 'Input';
 
-export { Input };

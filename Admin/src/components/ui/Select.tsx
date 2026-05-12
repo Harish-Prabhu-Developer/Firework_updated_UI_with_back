@@ -1,83 +1,110 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import { ChevronDown, Check } from 'lucide-react-native';
-import { Dialog } from './Dialog';
-import { cn } from '../../lib/utils';
-import { Button } from './Button';
+import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView, Platform } from 'react-native';
+import { ChevronDown, Check, AlertCircle } from 'lucide-react-native';
+import { LightColors as colors } from '../../styles/colors';
+import { Fonts, Radius } from '../../styles/globalStyles';
 
-interface SelectProps {
-  value: string;
-  onValueChange: (value: string) => void;
-  options: { label: string; value: string }[];
-  placeholder?: string;
+interface Option { label: string; value: string }
+
+interface Props {
   label?: string;
-  error?: string;
+  required?: boolean;
+  value?: string;
+  onValueChange: (v: string) => void;
+  options: Option[];
+  placeholder?: string;
   className?: string;
+  error?: string;
 }
 
-export function Select({ 
-  value, 
-  onValueChange, 
-  options, 
-  placeholder = "Select...", 
-  label, 
-  error,
-  className 
-}: SelectProps) {
+export const Select = ({ label, required = false, value, onValueChange, options, placeholder = 'Select…', error }: Props) => {
   const [open, setOpen] = useState(false);
-  const selectedOption = options.find(o => o.value === value);
+  const selected = options.find(o => o.value === value);
 
   return (
-    <View className={cn("gap-1.5", className)}>
-      {label && <Text className="text-sm font-medium text-foreground ml-1">{label}</Text>}
-      
-      <Pressable 
-        onPress={() => setOpen(true)}
-        className={cn(
-          "h-12 border rounded-xl px-4 flex-row items-center justify-between bg-card",
-          error ? "border-destructive" : "border-border"
-        )}
-      >
-        <Text className={cn(
-          "text-sm",
-          selectedOption ? "text-foreground" : "text-muted-foreground"
-        )}>
-          {selectedOption ? selectedOption.label : placeholder}
+    <View>
+      {label && (
+        <Text style={{ fontFamily: Fonts.body }} className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5">
+          {label} {required && <Text className="text-destructive">*</Text>}
         </Text>
-        <ChevronDown size={18} color="#64748b" />
-      </Pressable>
-
-      {error && <Text className="text-[10px] text-destructive ml-1">{error}</Text>}
-
-      <Dialog 
-        open={open} 
-        onOpenChange={setOpen} 
-        title={label || "Select Option"}
+      )}
+      <TouchableOpacity
+        onPress={() => setOpen(true)}
+        style={{ borderRadius: Radius.xl }}
+        className={`bg-card border px-3.5 h-11 flex-row items-center justify-between ${error ? 'border-destructive' : 'border-border'}`}
       >
-        <ScrollView className="max-h-[60vh] pb-10">
-          {options.map((opt) => (
-            <Pressable
-              key={opt.value}
-              onPress={() => {
-                onValueChange(opt.value);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex-row items-center justify-between p-4 border-b border-border/50 active:bg-muted/50",
-                value === opt.value && "bg-primary/5"
-              )}
-            >
-              <Text className={cn(
-                "text-sm",
-                value === opt.value ? "text-primary font-bold" : "text-foreground"
-              )}>
-                {opt.label}
-              </Text>
-              {value === opt.value && <Check size={16} color="#4f46e5" />}
-            </Pressable>
-          ))}
-        </ScrollView>
-      </Dialog>
+        <Text style={{ fontFamily: Fonts.body }} className={`text-sm flex-1 ${selected ? 'text-foreground font-medium' : 'text-muted-foreground'}`} numberOfLines={1}>
+          {selected?.label ?? placeholder}
+        </Text>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
+      {error && <Text style={{ fontFamily: Fonts.body }} className="text-xs text-destructive font-medium mt-1">{error}</Text>}
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+          onPress={() => setOpen(false)}
+        >
+          <Pressable onPress={e => e.stopPropagation?.()} style={{ width: '100%', maxWidth: 400, maxHeight: '90%' }}>
+            <View style={{ borderRadius: Radius.xxl, flexShrink: 1 }} className="bg-card overflow-hidden shadow-2xl border border-border">
+              <View className="px-5 py-4 border-b border-border bg-muted/30">
+                <Text style={{ fontFamily: Fonts.display, fontSize: 18 }} className="font-black text-foreground">
+                  {label ?? 'Select option'}
+                </Text>
+                {placeholder && !selected && (
+                  <Text style={{ fontFamily: Fonts.body }} className="text-xs text-muted-foreground mt-0.5">
+                    {placeholder}
+                  </Text>
+                )}
+              </View>
+              <ScrollView 
+                showsVerticalScrollIndicator={true} 
+                persistentScrollbar={true}
+                className="py-2"
+                style={{ flexShrink: 1 }}
+              >
+                {options.length > 0 ? (
+                  options.map((opt, idx) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      activeOpacity={0.7}
+                      onPress={() => { onValueChange(opt.value); setOpen(false); }}
+                      className={`flex-row items-center justify-between px-5 py-4 ${opt.value === value ? 'bg-primary/5' : ''}`}
+                      style={{ borderBottomWidth: idx === options.length - 1 ? 0 : 0.5, borderBottomColor: colors.border + '40' }}
+                    >
+                      <View className="flex-1">
+                        <Text style={{ fontFamily: Fonts.body }} className={`text-[15px] ${opt.value === value ? 'font-bold text-primary' : 'text-foreground'}`}>
+                          {opt.label}
+                        </Text>
+                      </View>
+                      {opt.value === value && (
+                        <View className="bg-primary/10 w-6 h-6 rounded-full items-center justify-center">
+                          <Check size={14} color={colors.primary} strokeWidth={3} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View className="py-12 items-center justify-center px-6">
+                    <View className="bg-muted w-16 h-16 rounded-full items-center justify-center mb-4">
+                      <AlertCircle size={32} color={colors.mutedForeground} />
+                    </View>
+                    <Text style={{ fontFamily: Fonts.display }} className="text-lg font-bold text-foreground mb-1">No Options</Text>
+                    <Text style={{ fontFamily: Fonts.body }} className="text-sm text-muted-foreground text-center">There are no items available to select at the moment.</Text>
+                  </View>
+                )}
+              </ScrollView>
+              <TouchableOpacity
+                onPress={() => setOpen(false)}
+                className="mx-4 my-4 bg-muted h-12 rounded-xl items-center justify-center"
+              >
+                <Text style={{ fontFamily: Fonts.body, fontWeight: '700' }} className="text-foreground">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
-}
+};
+

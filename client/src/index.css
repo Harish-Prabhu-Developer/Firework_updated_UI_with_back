@@ -1,0 +1,211 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+
+@theme {
+  --font-display: "Playfair Display", serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-footer: hsl(var(--footer-bg));
+  --color-footer-foreground: hsl(var(--footer-foreground));
+
+  --color-festive-gold: hsl(var(--festive-gold));
+  --color-festive-ruby: hsl(var(--festive-ruby));
+  --color-festive-sapphire: hsl(var(--festive-sapphire));
+  --color-festive-green: hsl(var(--festive-green));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-sparkle: sparkle 2s ease-in-out infinite;
+  --animate-marquee: marquee 20s linear infinite;
+  --animate-logo-glow: logo-glow 2.8s ease-in-out infinite;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  @keyframes fade-up {
+    0% { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+    100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
+  }
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes float-up {
+    0% { opacity: 0; transform: translateY(100px); }
+    20% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-100vh); }
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+  }
+  @keyframes logo-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 10px 24px hsl(var(--primary) / 0.28);
+      filter: saturate(1) brightness(1);
+    }
+    50% {
+      box-shadow: 0 0 0 1px hsl(var(--primary) / 0.62), 0 16px 38px hsl(var(--primary) / 0.5);
+      filter: saturate(1.18) brightness(1.08);
+    }
+  }
+  @keyframes logo-halo {
+    0%, 100% { opacity: 0.24; transform: scale(0.96); }
+    50% { opacity: 0.55; transform: scale(1.04); }
+  }
+  @keyframes shine-sweep {
+    0% { transform: translateX(-170%) skewX(-20deg); opacity: 0; }
+    22% { opacity: 0.9; }
+    45% { opacity: 0.22; }
+    100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-2px); }
+    40%, 80% { transform: translateX(2px); }
+  }
+
+  --animate-shake: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility section-padding {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  @media (min-width: 640px) {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  @media (min-width: 1024px) {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@utility container-narrow {
+  max-width: 72rem; /* 6xl is 72rem */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 99%;
+    --foreground: 240 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 43 65% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 15% 95%;
+    --secondary-foreground: 240 10% 10%;
+
+    --muted: 40 10% 93%;
+    --muted-foreground: 240 5% 42%;
+
+    --accent: 355 75% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 355 75% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 12% 90%;
+    --input: 40 12% 90%;
+    --ring: 43 65% 52%;
+
+    --radius: 0.75rem;
+
+    --footer-bg: 240 10% 10%;
+    --footer-foreground: 40 10% 72%;
+
+    --festive-gold: 43 75% 52%;
+    --festive-ruby: 355 75% 56%;
+    --festive-sapphire: 200 38% 44%;
+    --festive-green: 140 55% 42%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 43 65% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold;
+  }
+}

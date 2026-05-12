@@ -1,21 +1,24 @@
-import jwt from "jsonwebtoken";
-import "dotenv/config";
+import jwt from 'jsonwebtoken';
 
-const SECRET = process.env.JWT_SECRET || "default_secret";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "refresh_default_secret";
+const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_EXPIRES_IN = '7d';
+const REFRESH_EXPIRES_IN = '30d';
 
-export const signToken = (payload: object) =>
-  jwt.sign(payload, SECRET, { 
-    expiresIn: (process.env.JWT_EXPIRES as any) || "15m" 
-  });
+export interface TokenPayload {
+    id: string;
+    email?: string;
+    phone?: string;
+    roleId: string;
+}
 
-export const signRefreshToken = (payload: object) =>
-  jwt.sign(payload, REFRESH_SECRET, { 
-    expiresIn: (process.env.JWT_REFRESH_EXPIRES as any) || "7d" 
-  });
+export const generateAccessToken = (payload: TokenPayload): string => {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+};
 
-export const verifyToken = (token: string): any =>
-  jwt.verify(token, SECRET);
+export const generateRefreshToken = (payload: TokenPayload): string => {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_EXPIRES_IN });
+};
 
-export const verifyRefreshToken = (token: string): any =>
-  jwt.verify(token, REFRESH_SECRET);
+export const verifyToken = (token: string): TokenPayload => {
+    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+};

@@ -10,6 +10,8 @@ const compileNodeModules = [
     path.resolve(__dirname, 'node_modules/react-native-chart-kit'),
     path.resolve(__dirname, 'node_modules/react-native-svg'),
     path.resolve(__dirname, 'node_modules/react-native-camera-kit'),
+    path.resolve(__dirname, 'node_modules/react-native-toast-message'),
+    path.resolve(__dirname, 'node_modules/react-native-reanimated'),
 ];
 
 const babelLoaderConfiguration = {
@@ -25,9 +27,9 @@ const babelLoaderConfiguration = {
         loader: 'babel-loader',
         options: {
             cacheDirectory: true,
-            // The 'module:@react-native/babel-preset' preset includes JSX and flow support.
-            presets: ['module:@react-native/babel-preset'],
-            plugins: ['react-native-web'],
+            // Use project's babel configuration
+            presets: ['module:@react-native/babel-preset', 'nativewind/babel'],
+            plugins: ['react-native-web', 'react-native-reanimated/plugin'],
         },
     },
 };
@@ -79,7 +81,9 @@ module.exports = {
             'react-native-html-to-pdf': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
             'react-native-print': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
             'react-native-blob-util': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
+            'react-native-fs': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
             'react-native-camera-kit': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
+            '@react-native-voice/voice': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
         },
         extensions: ['.web.js', '.js', '.web.ts', '.ts', '.web.tsx', '.tsx', '.json'],
     },

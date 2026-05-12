@@ -1,78 +1,106 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./App.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: [
+    "./App.{js,jsx,ts,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
+
   presets: [require("nativewind/preset")],
+
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        background: "hsl(40, 20%, 97%)",
+        foreground: "hsl(150, 30%, 12%)",
+
+        card: "hsl(0, 0%, 100%)",
+        "card-foreground": "hsl(150, 30%, 12%)",
+
+        popover: "hsl(0, 0%, 100%)",
+        "popover-foreground": "hsl(150, 30%, 12%)",
+
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "hsl(145, 45%, 28%)",
+          foreground: "hsl(40, 20%, 97%)",
         },
+
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "hsl(35, 60%, 52%)",
+          foreground: "hsl(0, 0%, 100%)",
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
+
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "hsl(40, 15%, 92%)",
+          foreground: "hsl(150, 10%, 45%)",
         },
+
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "hsl(35, 80%, 55%)",
+          foreground: "hsl(30, 50%, 15%)",
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+
+        destructive: {
+          DEFAULT: "hsl(0, 72%, 51%)",
+          foreground: "hsl(0, 0%, 100%)",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
+
+        border: "hsl(40, 15%, 88%)",
+        input: "hsl(40, 15%, 88%)",
+        ring: "hsl(145, 45%, 28%)",
+
         sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+          DEFAULT: "hsl(150, 30%, 18%)",
+          foreground: "hsl(40, 20%, 90%)",
+
+          primary: "hsl(38, 80%, 55%)",
+          "primary-foreground": "hsl(150, 35%, 12%)",
+
+          accent: "hsl(150, 25%, 25%)",
+          border: "hsl(150, 20%, 25%)",
+          ring: "hsl(38, 80%, 55%)",
         },
-        status: {
-          active: "hsl(var(--status-active))",
-          inactive: "hsl(var(--status-inactive))",
-          pending: "hsl(var(--status-pending))",
-          confirmed: "hsl(var(--status-confirmed))",
-          converted: "hsl(var(--status-converted))",
-          cancelled: "hsl(var(--status-cancelled))",
+
+        success: {
+          DEFAULT: "hsl(145, 60%, 40%)",
+          foreground: "hsl(0, 0%, 100%)",
         },
-        payment: {
-          cash: "hsl(var(--payment-cash))",
-          upi: "hsl(var(--payment-upi))",
-          card: "hsl(var(--payment-card))",
+
+        warning: {
+          DEFAULT: "hsl(40, 90%, 50%)",
+          foreground: "hsl(30, 50%, 15%)",
         },
-        toast: {
-          success: "hsl(var(--toast-success))",
-          error: "hsl(var(--toast-error))",
-          bg: "hsl(var(--toast-bg))",
-        }
+
+        info: {
+          DEFAULT: "hsl(200, 70%, 50%)",
+          foreground: "hsl(0, 0%, 100%)",
+        },
+
+        chart: {
+          1: "hsl(145, 45%, 28%)",
+          2: "hsl(35, 80%, 55%)",
+          3: "hsl(200, 70%, 50%)",
+          4: "hsl(0, 72%, 51%)",
+          5: "hsl(280, 60%, 50%)",
+        },
       },
+
+      fontFamily: {
+        display: ["Plus Jakarta Sans", "sans-serif"],
+        body: ["DM Sans", "sans-serif"],
+      },
+
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xl: "0.75rem",
+      },
+
+      boxShadow: {
+        sm: "0 1px 2px rgba(0,0,0,0.05)",
+        md: "0 4px 6px rgba(0,0,0,0.1)",
       },
     },
   },
+
+  darkMode: "class",
+
   plugins: [],
-}
+};

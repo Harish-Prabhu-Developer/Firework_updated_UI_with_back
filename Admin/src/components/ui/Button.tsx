@@ -1,39 +1,12 @@
 import React from 'react';
-import { Pressable, Text, ActivityIndicator, View, PressableProps, Platform } from 'react-native';
-import { cva } from 'class-variance-authority';
+import { TouchableOpacity, Text, TouchableOpacityProps, ActivityIndicator, View } from 'react-native';
 import { cn } from '../../lib/utils';
+import { LightColors as colors } from '../../styles/colors';
+import { Fonts, Radius } from '../../styles/globalStyles';
 
-const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:opacity-50 active:opacity-80 px-4 py-2',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline: 'border border-input bg-transparent hover:bg-accent hover:text-accent-foreground',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'bg-transparent hover:bg-accent hover:text-accent-foreground',
-        link: 'bg-transparent underline text-primary hover:text-primary/80',
-        edit: 'bg-indigo-600 text-white hover:bg-indigo-700',
-        danger: 'bg-red-600 text-white hover:bg-red-700',
-      },
-      size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 px-3 rounded-md',
-        lg: 'h-11 px-8 rounded-md',
-        icon: 'h-10 w-10',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  }
-);
-
-export interface ButtonProps extends Omit<PressableProps, 'children'> {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'edit' | 'danger' | null;
-  size?: 'default' | 'sm' | 'lg' | 'icon' | null;
+interface Props extends TouchableOpacityProps {
+  variant?: 'default' | 'outline' | 'ghost' | 'destructive' | 'secondary';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
   label?: string;
   loading?: boolean;
   className?: string;
@@ -41,40 +14,77 @@ export interface ButtonProps extends Omit<PressableProps, 'children'> {
   children?: React.ReactNode;
 }
 
-export const Button = React.forwardRef<View, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', label, children, loading, textClassName, ...props }, ref) => {
-    const isDarkBackground = variant === 'default' || variant === 'destructive' || variant === 'secondary' || variant === 'edit' || variant === 'danger';
-    const indicatorColor = isDarkBackground ? '#ffffff' : '#6366f1';
+const variantClasses: Record<string, string> = {
+  default: 'bg-primary border border-primary',
+  outline: 'bg-card border border-border',
+  ghost: 'bg-transparent border border-transparent',
+  destructive: 'bg-destructive border border-destructive',
+  secondary: 'bg-secondary border border-secondary',
+};
 
-    return (
-      <Pressable
-        ref={ref}
-        style={({ pressed }) => [
-          Platform.OS !== 'web' && { opacity: pressed ? 0.7 : 1 }
-        ]}
-        className={cn(buttonVariants({ variant: variant as any, size: size as any, className }))}
-        disabled={loading || props.disabled}
-        {...props}
-      >
-        {loading ? (
-          <ActivityIndicator color={indicatorColor} size="small" />
-        ) : (
-          <View className="flex-row items-center justify-center gap-2">
-            {children}
-            {label && (
-              <Text className={cn('font-medium', 
-                variant === 'outline' || variant === 'ghost' || variant === 'link' ? 'text-foreground' : 
-                isDarkBackground ? 'text-white' : 
-                'text-primary-foreground', 
-                textClassName)}>
-                {label}
-              </Text>
-            )}
-          </View>
-        )}
-      </Pressable>
-    );
-  }
+const textVariantClasses: Record<string, string> = {
+  default: 'text-primary-foreground',
+  outline: 'text-foreground',
+  ghost: 'text-foreground',
+  destructive: 'text-destructive-foreground',
+  secondary: 'text-secondary-foreground',
+};
+
+const sizeClasses: Record<string, string> = {
+  sm: 'h-8 px-3',
+  md: 'h-10 px-4',
+  lg: 'h-12 px-6',
+  icon: 'h-10 w-10',
+};
+
+const textSizeClasses: Record<string, string> = {
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-base',
+  icon: 'text-sm',
+};
+
+const sizeRadius: Record<string, number> = {
+  sm: Radius.md,
+  md: Radius.xl,
+  lg: Radius.xl,
+  icon: Radius.xl,
+};
+
+export const Button = ({
+  variant = 'default',
+  size = 'md',
+  label,
+  loading,
+  className,
+  textClassName,
+  children,
+  disabled,
+  style,
+  ...props
+}: Props) => (
+  <TouchableOpacity
+    disabled={disabled || loading}
+    activeOpacity={0.8}
+    style={[{ borderRadius: sizeRadius[size] }, style as any]}
+    className={cn(
+      'flex-row items-center justify-center gap-2',
+      variantClasses[variant],
+      sizeClasses[size],
+      (disabled || loading) && 'opacity-50',
+      className
+    )}
+    {...props}
+  >
+    {loading ? (
+      <ActivityIndicator size="small" color={variant === 'default' || variant === 'destructive' || variant === 'secondary' ? colors.primaryForeground : colors.primary} />
+    ) : null}
+    {children}
+    {label && (
+      <Text style={{ fontFamily: Fonts.body }} className={cn('font-bold', textVariantClasses[variant], textSizeClasses[size], textClassName)}>
+        {label}
+      </Text>
+    )}
+  </TouchableOpacity>
 );
 
-Button.displayName = 'Button';

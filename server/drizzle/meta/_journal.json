@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1771780595856,
-      "tag": "0000_loving_newton_destine",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1773850835858,
-      "tag": "0001_sloppy_toxin",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775150517622,
-      "tag": "0002_legal_blue_marvel",
+      "when": 1777802220843,
+      "tag": "0000_old_morph",
       "breakpoints": true
     }
   ]

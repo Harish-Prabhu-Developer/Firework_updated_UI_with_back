@@ -10,8 +10,8 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { products } from "./category.js";
-import { users } from "./users.js";
+import { products } from "./category";
+import { users } from "./users";
 
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "upi", "card"]);
 export const orderStatusEnum = pgEnum("order_status", ["pending", "confirmed", "converted", "cancelled"]);

@@ -1,43 +1,41 @@
 import React from 'react';
-import { TextInput, View, Text } from 'react-native';
+import { View, Text, TextInput, TextInputProps } from 'react-native';
 import { cn } from '../../lib/utils';
+import { LightColors as colors } from '../../styles/colors';
+import { Fonts, Radius } from '../../styles/globalStyles';
 
-export interface TextareaProps extends React.ComponentPropsWithoutRef<typeof TextInput> {
+interface Props extends TextInputProps {
   label?: string;
   error?: string;
-  containerClassName?: string;
+  className?: string;
+  rows?: number;
 }
 
-const Textarea = React.forwardRef<TextInput, TextareaProps>(
-  ({ className, label, error, containerClassName, ...props }, ref) => {
-    return (
-      <View className={cn('w-full flex flex-col gap-1.5', containerClassName)}>
-        {label && (
-          <Text className="text-sm font-medium text-foreground ml-1">
-            {label}
-          </Text>
-        )}
-        <TextInput
-          ref={ref}
-          multiline
-          textAlignVertical="top"
-          className={cn(
-            'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:border-ring disabled:opacity-50',
-            error && 'border-destructive',
-            className
-          )}
-          placeholderTextColor="#94a3b8"
-          {...props}
-        />
-        {error && (
-          <Text className="text-xs font-medium text-destructive ml-1">
-            {error}
-          </Text>
-        )}
-      </View>
-    );
-  }
+export const Textarea = ({ label, error, className, rows = 4, style, ...props }: Props) => (
+  <View>
+    {label && (
+      <Text style={{ fontFamily: Fonts.body }} className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5">
+        {label}
+      </Text>
+    )}
+    <TextInput
+      multiline
+      textAlignVertical="top"
+      numberOfLines={rows}
+      style={[{ minHeight: rows * 22, outline: 'none', borderRadius: Radius.xl, fontFamily: Fonts.body }, style as any]}
+      className={cn(
+        'bg-card border px-3.5 py-3 text-sm text-foreground',
+        error ? 'border-destructive' : 'border-border',
+        className
+      )}
+      placeholderTextColor={colors.mutedForeground}
+      {...props}
+    />
+    {error && (
+      <Text style={{ fontFamily: Fonts.body }} className="text-xs text-destructive font-medium mt-1">
+        {error}
+      </Text>
+    )}
+  </View>
 );
-Textarea.displayName = 'Textarea';
 
-export { Textarea };

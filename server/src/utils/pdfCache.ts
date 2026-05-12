@@ -1,22 +1,28 @@
-/**
- * Shared PDF Cache Module
- * Avoids circular imports between invoiceController and settingsController
- */
-const pdfCacheMap = new Map<string, { buffer: Buffer; timestamp: number }>();
+import fs from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
 
-export const PDF_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_DIR = path.join(process.cwd(), 'cache', 'pdfs');
 
-export const pdfCache = {
-    get: (key: string) => pdfCacheMap.get(key),
-    set: (key: string, value: { buffer: Buffer; timestamp: number }) => pdfCacheMap.set(key, value),
-    delete: (key: string) => {
-        console.log(`🗑️ Evicted PDF cache for invoice: ${key}`);
-        pdfCacheMap.delete(key);
-    },
-    clear: () => {
-        console.log(`🧹 PDF Cache fully cleared. Was holding ${pdfCacheMap.size} entries.`);
-        pdfCacheMap.clear();
-    },
-    has: (key: string) => pdfCacheMap.has(key),
-    size: () => pdfCacheMap.size,
+export const ensureCacheDir = async () => {
+    await fs.mkdir(CACHE_DIR, { recursive: true });
+};
+
+export const getCacheKey = (identifier: string): string => {
+    return crypto.createHash('md5').update(identifier).digest('hex');
+};
+
+export const getCachedPDF = async (key: string): Promise<Buffer | null> => {
+    try {
+        const filePath = path.join(CACHE_DIR, `${key}.pdf`);
+        return await fs.readFile(filePath);
+    } catch {
+        return null;
+    }
+};
+
+export const cachePDF = async (key: string, buffer: Buffer): Promise<void> => {
+    await ensureCacheDir();
+    const filePath = path.join(CACHE_DIR, `${key}.pdf`);
+    await fs.writeFile(filePath, buffer);
 };

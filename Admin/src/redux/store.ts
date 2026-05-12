@@ -1,9 +1,42 @@
-import { configureStore } from '@reduxjs/toolkit';
-import uiReducer from './uiSlice';
+import { configureStore, createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+/* ── Generic UI slice factory ────────────────────── */
+const makeUISlice = (name: string) =>
+  createSlice({
+    name,
+    initialState: { search: '', selectedIds: [] as string[] },
+    reducers: {
+      setSearch: (state, action: PayloadAction<string>) => { state.search = action.payload; },
+      setSelectedIds: (state, action: PayloadAction<string[]>) => { state.selectedIds = action.payload; },
+      clearSelection: (state) => { state.selectedIds = []; },
+    },
+  });
+
+export const categoryUISlice = makeUISlice('categoryUI');
+export const productUISlice = makeUISlice('productUI');
+export const customerUISlice = makeUISlice('customerUI');
+export const orderUISlice = makeUISlice('orderUI');
+export const invoiceUISlice = makeUISlice('invoiceUI');
+export const heroUISlice = makeUISlice('heroUI');
+export const tagUISlice = makeUISlice('tagUI');
+export const userUISlice = makeUISlice('userUI');
+export const roleUISlice = makeUISlice('roleUI');
+export const uomUISlice = makeUISlice('uomUI');
+export const videoUISlice = makeUISlice('videoUI');
 
 export const store = configureStore({
   reducer: {
-    ui: uiReducer,
+    categoryUI: categoryUISlice.reducer,
+    productUI: productUISlice.reducer,
+    customerUI: customerUISlice.reducer,
+    orderUI: orderUISlice.reducer,
+    invoiceUI: invoiceUISlice.reducer,
+    heroUI: heroUISlice.reducer,
+    tagUI: tagUISlice.reducer,
+    userUI: userUISlice.reducer,
+    roleUI: roleUISlice.reducer,
+    uomUI: uomUISlice.reducer,
+    videoUI: videoUISlice.reducer,
   },
 });
 
