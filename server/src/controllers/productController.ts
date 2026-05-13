@@ -17,6 +17,7 @@ export const createProduct = async (req: Request, res: Response) => {
         const {
             categoryId, uomId, name, description, image, images = [],
             rank, mrp, sellingPrice, conversionQty, isActive,
+            quantity,
         } = req.body;
 
         if (!categoryId || !uomId || !name || !mrp || !sellingPrice) {
@@ -45,8 +46,14 @@ export const createProduct = async (req: Request, res: Response) => {
             isActive: isActive !== undefined ? isActive : true,
         }).returning();
 
-        // Auto-create stock record
-        await db.insert(productStocks).values({ productId: product.id, quantity: 0 }).onConflictDoNothing();
+        // Auto-create stock record with initial quantity
+        await db.insert(productStocks).values({ 
+            productId: product.id, 
+            quantity: quantity || 0 
+        }).onConflictDoUpdate({
+            target: productStocks.productId,
+            set: { quantity: quantity || 0, updatedAt: new Date() }
+        });
 
         res.status(201).json({ success: true, data: product });
     } catch (error: any) {
@@ -60,6 +67,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         const {
             categoryId, uomId, name, description, image, images,
             rank, mrp, sellingPrice, conversionQty, isActive,
+            quantity,
         } = req.body;
         if (!id) return res.status(400).json({ success: false, msg: 'Product ID required' });
 
@@ -78,6 +86,15 @@ export const updateProduct = async (req: Request, res: Response) => {
         if (sellingPrice !== undefined) updateData.sellingPrice = sellingPrice.toString();
         if (conversionQty !== undefined) updateData.conversionQty = conversionQty;
         if (isActive !== undefined) updateData.isActive = isActive;
+        
+        if (quantity !== undefined) {
+            await db.insert(productStocks)
+                .values({ productId: id, quantity })
+                .onConflictDoUpdate({
+                    target: productStocks.productId,
+                    set: { quantity, updatedAt: new Date() }
+                });
+        }
 
         const [product] = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
         if (!product) return res.status(404).json({ success: false, msg: 'Product not found' });
@@ -101,7 +118,8 @@ export const getAllProducts = async (req: Request, res: Response) => {
             .select()
             .from(products)
             .innerJoin(categories, eq(products.categoryId, categories.id))
-            .innerJoin(uoms, eq(products.uomId, uoms.id));
+            .innerJoin(uoms, eq(products.uomId, uoms.id))
+            .leftJoin(productStocks, eq(products.id, productStocks.productId));
 
         const conditions: SQL[] = [];
         if (categoryId) conditions.push(eq(products.categoryId, categoryId));
@@ -120,6 +138,7 @@ export const getAllProducts = async (req: Request, res: Response) => {
             images: safeParseJSON(row.products.images as string | null),
             category: row.category,
             uom: row.uoms,
+            stock: row.product_stocks,
         }));
 
         res.json({

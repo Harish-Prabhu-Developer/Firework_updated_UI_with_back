@@ -16,6 +16,7 @@ import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
 import { RootState, roleUISlice } from '../redux/store';
 import { exportCSV } from '../utils/exportUtils';
+import { useNavigation } from '@react-navigation/native';
 
 interface Role { id: string; name: string; description?: string; isActive?: boolean; createdAt?: string }
 interface Module { id: string; name: string; slug: string }
@@ -120,9 +121,9 @@ export const useRoleQueries = (permRoleId?: string) => {
 
 export default function Roles() {
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
   const roleUI = useSelector((state: RootState) => state.roleUI);
-  const [permRole, setPermRole] = useState<Role | null>(null);
-  const { query, modules, actions, rolePerms, save, remove, bulkRemove, savePerms } = useRoleQueries(permRole?.id);
+  const { query, save, remove, bulkRemove } = useRoleQueries();
 
   const all = useMemo(() => query.data ?? [], [query.data]);
   const search = roleUI.search;
@@ -133,24 +134,10 @@ export default function Roles() {
   const [form, setForm] = useState({ name: '', description: '', isActive: true });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [permMatrix, setPermMatrix] = useState<Record<string, Record<string, boolean>>>({});
 
   const setSearch = (value: string) => dispatch(roleUISlice.actions.setSearch(value));
   const setSelectedIds = (ids: Set<string>) => dispatch(roleUISlice.actions.setSelectedIds([...ids]));
 
-  useEffect(() => {
-    if (!permRole) {
-      setPermMatrix({});
-      return;
-    }
-
-    const matrix: Record<string, Record<string, boolean>> = {};
-    rolePerms.forEach(p => {
-      if (!matrix[p.moduleId]) matrix[p.moduleId] = {};
-      matrix[p.moduleId][p.actionId] = Boolean(p.isAllowed || p.allowAll);
-    });
-    setPermMatrix(matrix);
-  }, [rolePerms, permRole]);
 
   const data = useMemo(() => {
     if (!search.trim()) return all;
@@ -176,20 +163,13 @@ export default function Roles() {
     setSelectedIds(next);
   };
 
-  const togglePerm = (moduleId: string, actionId: string) => {
-    setPermMatrix(prev => ({ ...prev, [moduleId]: { ...(prev[moduleId] ?? {}), [actionId]: !(prev[moduleId]?.[actionId] ?? false) } }));
-  };
-
-  const toggleModuleAll = (moduleId: string, grant: boolean) => {
-    setPermMatrix(prev => ({ ...prev, [moduleId]: Object.fromEntries(actions.map(a => [a.id, grant])) }));
-  };
-
   const columns: Column<Role>[] = [
     { key: 'name', label: 'Role', width: 180, render: (r) => <View className="flex-row items-center gap-2"><View className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Shield size={16} color={colors.primary} /></View><Text style={{ fontFamily: Fonts.body }} className="font-bold text-sm text-foreground">{r.name}</Text></View> },
     { key: 'description', label: 'Description', width: 240, render: (r) => <Text style={{ fontFamily: Fonts.body }} className="text-sm text-muted-foreground" numberOfLines={2}>{r.description || '-'}</Text> },
     { key: 'createdAt', label: 'Created', width: 120, render: (r) => <Text style={{ fontFamily: Fonts.body }} className="text-xs text-muted-foreground">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-'}</Text> },
     { key: 'isActive', label: 'Status', width: 100, render: (r) => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} /> },
-    { key: 'actions', label: 'Actions', width: 140, align: 'center', render: (r) => <View className="flex-row gap-2"><TouchableOpacity onPress={() => setPermRole(r)} className="w-8 h-8 rounded-lg bg-secondary/10 items-center justify-center"><Lock size={14} color={colors.secondary} /></TouchableOpacity><TouchableOpacity onPress={() => openEdit(r)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(r.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
+    { key: 'actions', label: 'Actions', width: 140, align: 'center', render: (r) => <View className="flex-row gap-2"><TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="w-8 h-8 rounded-lg bg-secondary/10 items-center justify-center"><Lock size={14} color={colors.secondary} /></TouchableOpacity><TouchableOpacity onPress={() => openEdit(r)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(r.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
+
   ];
 
   const renderCard = (r: Role) => (
@@ -202,7 +182,7 @@ export default function Roles() {
         </View>
       </View>
       <View className="flex-row border-t border-border/40 pt-2">
-        <TouchableOpacity onPress={() => setPermRole(r)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Lock size={13} color={colors.secondary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-secondary">Permissions</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Lock size={13} color={colors.secondary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-secondary">Permissions</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => openEdit(r)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-primary">Edit</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => setDeleteId(r.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-destructive">Delete</Text></TouchableOpacity>
       </View>
@@ -293,51 +273,7 @@ export default function Roles() {
         </View>
       </FormModal>
 
-      <FormModal
-        open={!!permRole}
-        onClose={() => setPermRole(null)}
-        title={`Permissions: ${permRole?.name ?? ''}`}
-        subtitle="Toggle module access for this role"
-        maxWidth={680}
-        footer={<View className="flex-row gap-3"><TouchableOpacity onPress={() => setPermRole(null)} className="flex-1 h-11 rounded-xl border border-border items-center justify-center"><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold">Cancel</Text></TouchableOpacity><TouchableOpacity onPress={() => {
-          if (!permRole) return;
-          const permissions = modules.flatMap(m => actions.map(a => ({ moduleId: m.id, actionId: a.id, isAllowed: permMatrix[m.id]?.[a.id] ?? false, allowAll: false })));
-          savePerms.mutate({ roleId: permRole.id, permissions }, { onSuccess: () => setPermRole(null) });
-        }} disabled={savePerms.isPending} className="flex-1 h-11 rounded-xl bg-primary items-center justify-center"><Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-primary-foreground">{savePerms.isPending ? 'Saving...' : 'Save Permissions'}</Text></TouchableOpacity></View>}
-      >
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: 480 }}>
-            <View className="flex-row bg-muted rounded-xl mb-2 border border-border overflow-hidden">
-              <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-muted-foreground uppercase w-44 px-3 py-3">Module</Text>
-              {actions.map(a => <Text key={a.id} style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-muted-foreground uppercase w-24 text-center py-3">{a.name}</Text>)}
-              <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-muted-foreground uppercase w-20 text-center py-3">All</Text>
-            </View>
-            {modules.map((m, i) => {
-              const allGranted = actions.length > 0 && actions.every(a => permMatrix[m.id]?.[a.id]);
-              return (
-                <View key={m.id} className={`flex-row items-center border-b border-border/40 py-2 ${i % 2 === 0 ? '' : 'bg-muted/30'}`}>
-                  <Text style={{ fontFamily: Fonts.body }} className="text-sm font-semibold text-foreground w-44 px-3" numberOfLines={1}>{m.name}</Text>
-                  {actions.map(a => {
-                    const allowed = permMatrix[m.id]?.[a.id] ?? false;
-                    return (
-                      <TouchableOpacity key={a.id} onPress={() => togglePerm(m.id, a.id)} className="w-24 items-center py-1">
-                        <View style={{ borderRadius: Radius.sm }} className={`w-6 h-6 border-2 items-center justify-center ${allowed ? 'bg-primary border-primary' : 'bg-card border-border'}`}>
-                          {allowed && <Check size={13} color={colors.primaryForeground} strokeWidth={3} />}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  <TouchableOpacity onPress={() => toggleModuleAll(m.id, !allGranted)} className="w-20 items-center">
-                    <View className={`px-2.5 py-1 rounded-full ${allGranted ? 'bg-success/10' : 'bg-muted'}`}>
-                      <Text style={{ fontFamily: Fonts.body }} className={`text-[9px] font-black uppercase ${allGranted ? 'text-success' : 'text-muted-foreground'}`}>{allGranted ? 'All' : 'None'}</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
-      </FormModal>
+
 
       <DeleteConfirmModal open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)} itemName="role" onConfirm={() => deleteId && remove.mutate(deleteId, { onSuccess: () => setDeleteId(null) })} loading={remove.isPending} />
       <DeleteConfirmModal open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} count={selectedIds.size} itemName="role" onConfirm={() => bulkRemove.mutate([...selectedIds], { onSuccess: () => { setSelectedIds(new Set()); setBulkDeleteOpen(false); } })} loading={bulkRemove.isPending} />

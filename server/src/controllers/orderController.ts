@@ -54,6 +54,19 @@ export const createOrder = async (req: Request, res: Response) => {
             customer = inserted[0];
         }
 
+        // 0. Check Settings (Sales Status and Minimum Order)
+        const settingRows = await db.select().from(settings).limit(1);
+        const shopSettings = settingRows[0];
+
+        if (shopSettings) {
+            if (!shopSettings.salesStatus) {
+                return res.status(403).json({ success: false, message: "Store is currently not accepting orders." });
+            }
+            if (Number(totalAmount) < shopSettings.minimumOrder) {
+                return res.status(400).json({ success: false, message: `Minimum order amount is ₹${shopSettings.minimumOrder}` });
+            }
+        }
+
         const orderNumber = await generateOrderNumber();
 
         // 3. Create Order
@@ -251,7 +264,7 @@ export const getOrderPDF = async (req: Request, res: Response) => {
             { ...order[0], customer: customer[0], items },
             '',
             shopInfo,
-            false
+            shopInfo.orderReceiptQrStatus ?? false
         );
 
         const pdf = await generatePDFFromHTML(html, `order_${order[0].orderNumber}`);

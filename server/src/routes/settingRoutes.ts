@@ -4,9 +4,8 @@ import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
 
 const router = Router();
-router.use(authenticate);
 
-router.get('/', checkPermission('settings', 'read'), getSettings);
-router.put('/', checkPermission('settings', 'update'), updateSettings);
+router.get('/', getSettings);
+router.put('/', authenticate, checkPermission('settings', 'update'), updateSettings);
 
 export default router;

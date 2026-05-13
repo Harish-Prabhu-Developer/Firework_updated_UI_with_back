@@ -18,6 +18,7 @@ import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
 import { AdaptiveTable } from '../components/AdaptiveTable';
 import { FormModal } from '../components/modals/FormModal';
 import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
+import { ImagePreviewModal } from '../components/modals/ImagePreviewModal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
 import { Button } from '../components/ui/Button';
@@ -274,6 +275,9 @@ export default function Media() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [editHeroId, setEditHeroId] = useState<string | null>(null);
   const [heroForm, setHeroForm] = useState<HeroFormState>(createDefaultHeroForm(heroes.length + 1));
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>('');
+  const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
 
   const filteredHeroes = useMemo(() => {
     const query = heroSearch.trim().toLowerCase();
@@ -448,35 +452,46 @@ export default function Media() {
     >
       {activeMode === 'Hero' ? (
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <Card style={{ borderRadius: Radius['3xl'] }} className="mb-6 overflow-hidden border-0">
-            <View className="absolute inset-0 bg-black/35 z-10" />
-            <Image
-              source={{ uri: activeHero?.image ?? 'https://picsum.photos/id/20/1920/900' }}
-              className="w-full h-[280px]"
-              resizeMode="cover"
-            />
-            <View className="absolute inset-0 z-20 p-6 justify-center">
-              <View className="flex-row items-center gap-2 mb-4">
-                <View className="h-8 w-8 rounded-full bg-white/20 items-center justify-center">
-                  {activeHero ? getBadgeIcon(activeHero.badgeIcon, 16, '#ffffff') : null}
+          <TouchableOpacity 
+            activeOpacity={0.9}
+            onPress={() => {
+              if (activeHero) {
+                setPreviewUri(activeHero.image);
+                setPreviewName(activeHero.title);
+                setPreviewType('image');
+              }
+            }}
+          >
+            <Card style={{ borderRadius: Radius['3xl'] }} className="mb-6 overflow-hidden border-0">
+              <View className="absolute inset-0 bg-black/35 z-10" />
+              <Image
+                source={{ uri: activeHero?.image ?? 'https://picsum.photos/id/20/1920/900' }}
+                className="w-full h-[280px]"
+                resizeMode="cover"
+              />
+              <View className="absolute inset-0 z-20 p-6 justify-center">
+                <View className="flex-row items-center gap-2 mb-4">
+                  <View className="h-8 w-8 rounded-full bg-white/20 items-center justify-center">
+                    {activeHero ? getBadgeIcon(activeHero.badgeIcon, 16, '#ffffff') : null}
+                  </View>
+                  <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-white bg-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
+                    {activeHero?.badge ?? 'No Active Slide'}
+                  </Text>
                 </View>
-                <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-white bg-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                  {activeHero?.badge ?? 'No Active Slide'}
+                <Text style={{ fontFamily: Fonts.display }} className="text-3xl font-black text-white leading-tight mb-3">
+                  {activeHero?.title ?? 'Media Manager'}
                 </Text>
-              </View>
-              <Text style={{ fontFamily: Fonts.display }} className="text-3xl font-black text-white leading-tight mb-3">
-                {activeHero?.title ?? 'Media Manager'}
-              </Text>
-              <Text style={{ fontFamily: Fonts.body }} className="text-sm text-white/80 leading-relaxed mb-6 max-w-[85%]">
-                {activeHero?.description ?? 'Use the slide inventory below to keep the storefront visuals fresh and consistent.'}
-              </Text>
-              <View style={{ borderRadius: Radius.full }} className="self-start bg-white px-6 py-3">
-                <Text style={{ fontFamily: Fonts.body }} className="text-xs font-black text-primary uppercase tracking-widest">
-                  {activeHero?.cta ?? 'Learn More'}
+                <Text style={{ fontFamily: Fonts.body }} className="text-sm text-white/80 leading-relaxed mb-6 max-w-[85%]">
+                  {activeHero?.description ?? 'Use the slide inventory below to keep the storefront visuals fresh and consistent.'}
                 </Text>
+                <View style={{ borderRadius: Radius.full }} className="self-start bg-white px-6 py-3">
+                  <Text style={{ fontFamily: Fonts.body }} className="text-xs font-black text-primary uppercase tracking-widest">
+                    {activeHero?.cta ?? 'Learn More'}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+          </TouchableOpacity>
 
           <AdaptiveTable
             data={filteredHeroes}
@@ -547,7 +562,7 @@ export default function Media() {
           />
         </ScrollView>
       ) : (
-        <View className="flex-1">
+        <View style={{ flex: 1 }}>
           <View className="flex-row items-center gap-3 mb-5">
             <View className="flex-1">
               <Input
@@ -570,6 +585,7 @@ export default function Media() {
             data={filteredAssets}
             keyExtractor={(item) => item.id}
             numColumns={isMobile ? 2 : 4}
+            style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 24 }}
             ListEmptyComponent={
@@ -578,7 +594,16 @@ export default function Media() {
               </View>
             }
             renderItem={({ item }) => (
-              <View style={{ width: isMobile ? '50%' : '25%' }} className="p-2">
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={{ width: isMobile ? '50%' : '25%' }} 
+                className="p-2"
+                onPress={() => {
+                  setPreviewUri(item.url);
+                  setPreviewName(item.name);
+                  setPreviewType(item.type);
+                }}
+              >
                 <Card style={{ borderRadius: Radius.xl }} className="overflow-hidden border border-border bg-card">
                   <View className="aspect-square bg-muted items-center justify-center">
                     {item.type === 'image' ? (
@@ -605,7 +630,7 @@ export default function Media() {
                     </View>
                   </View>
                 </Card>
-              </View>
+              </TouchableOpacity>
             )}
           />
         </View>
@@ -743,6 +768,14 @@ export default function Media() {
           }
         })}
         loading={bulkRemoveHero.isPending}
+      />
+
+      <ImagePreviewModal
+        open={!!previewUri}
+        uri={previewUri}
+        name={previewName}
+        type={previewType}
+        onClose={() => setPreviewUri(null)}
       />
     </MasterScreenLayout>
   );

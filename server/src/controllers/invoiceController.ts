@@ -5,7 +5,7 @@ import { products } from '../db/schema/category.js';
 import { settings } from '../db/schema/settings.js';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { generateInvoiceNumber, formatCurrency } from '../utils/helpers.js';
-import { decrypt } from '../utils/crypto.js';
+import { decrypt, encrypt } from '../utils/crypto.js';
 import { generatePDFFromHTML } from '../services/pdfService.js';
 import { generateInvoiceHTML } from '../templates/invoiceTemplate.js';
 import { generateQRCodeDataURL } from '../utils/qrCode.js';
@@ -17,11 +17,31 @@ import {
 
 export const createInvoice = async (req: Request, res: Response) => {
     try {
-        const { customerId, items, discountAmount = 0, taxAmount = 0, paymentMethod = 'cash', notes } = req.body;
-        if (!customerId || !items?.length) return res.status(400).json({ success: false, msg: 'Customer and items required' });
+        const { CustomerData, items, discountAmount = 0, taxAmount = 0, paymentMethod = 'cash', notes } = req.body;
+        
+        if (!CustomerData || !items?.length) {
+            return res.status(400).json({ success: false, msg: 'Customer details and items are required' });
+        }
 
-        const customer = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
-        if (!customer[0]) return res.status(404).json({ success: false, msg: 'Customer not found' });
+        const { phone, name, email, address } = CustomerData;
+        if (!phone) return res.status(400).json({ success: false, msg: 'Customer phone is required' });
+
+        // Find or create customer
+        let customerId: string;
+        const existingCustomer = await db.select().from(customers).where(eq(customers.phone, phone)).limit(1);
+
+        if (existingCustomer[0]) {
+            customerId = existingCustomer[0].id;
+        } else {
+            if (!name) return res.status(400).json({ success: false, msg: 'Customer name is required for registration' });
+            const [newCustomer] = await db.insert(customers).values({
+                name,
+                phone,
+                email: email || null,
+                address: address || null,
+            }).returning();
+            customerId = newCustomer.id;
+        }
 
         let subTotal = 0;
         const invoiceItemsData = [];
@@ -138,7 +158,7 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
         if (!customerData) return res.status(404).json({ success: false, msg: 'Customer not found' });
 
         const qrData = `Invoice: ${invoice[0].invoiceNumber}\nCustomer: ${customerData.name}\nAmount: ${formatCurrency(invoice[0].totalAmount)}`;
-        const qrCodeDataUrl = await generateQRCodeDataURL(qrData);
+        const qrCodeDataUrl = shopInfo.invoiceQrStatus !== false ? await generateQRCodeDataURL(qrData) : '';
 
         const html = generateInvoiceHTML({ ...invoice[0], customer: customerData, items }, qrCodeDataUrl, shopInfo);
         const pdf = await generatePDFFromHTML(html, `invoice_${invoice[0].invoiceNumber}`);
@@ -159,6 +179,21 @@ export const deleteInvoice = async (req: Request, res: Response) => {
         const result = await db.delete(invoices).where(eq(invoices.id, id));
         if (!result.rowCount) return res.status(404).json({ success: false, msg: 'Invoice not found' });
         res.json({ success: true, msg: 'Invoice deleted' });
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
+export const getInvoiceToken = async (req: Request, res: Response) => {
+    try {
+        const id = paramToString(req.params.id);
+        if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
+
+        const invoice = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+        if (!invoice[0]) return res.status(404).json({ success: false, msg: 'Invoice not found' });
+
+        const token = encrypt(id);
+        res.json({ success: true, data: { token } });
     } catch (error: any) {
         res.status(500).json({ success: false, msg: error.message });
     }

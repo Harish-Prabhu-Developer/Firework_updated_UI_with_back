@@ -15,13 +15,29 @@ export const getSettings = async (req: Request, res: Response) => {
 
 export const updateSettings = async (req: Request, res: Response) => {
     try {
-        const { shopName, shopPhone, shopAddress, shopGst } = req.body;
+        const { 
+            shopName, shopPhone, shopAddress, shopGst, 
+            shopEmail, minimumOrder, whatsappNum, socialMedias,
+            salesStatus, orderReceiptQrStatus, invoiceQrStatus 
+        } = req.body;
         const existing = await db.select().from(settings).limit(1);
+        const settingsData = {
+            shopName, shopPhone, shopAddress, shopGst,
+            shopEmail, minimumOrder, whatsappNum, socialMedias,
+            salesStatus, orderReceiptQrStatus, invoiceQrStatus,
+            updatedAt: new Date()
+        };
+
         let result;
         if (existing[0]) {
-            result = await db.update(settings).set({ shopName, shopPhone, shopAddress, shopGst, updatedAt: new Date() }).where(eq(settings.id, existing[0].id)).returning();
+            result = await db.update(settings)
+                .set(settingsData)
+                .where(eq(settings.id, existing[0].id))
+                .returning();
         } else {
-            result = await db.insert(settings).values({ shopName, shopPhone, shopAddress, shopGst }).returning();
+            result = await db.insert(settings)
+                .values(settingsData)
+                .returning();
         }
         res.json({ success: true, data: result[0] });
     } catch (error: any) {

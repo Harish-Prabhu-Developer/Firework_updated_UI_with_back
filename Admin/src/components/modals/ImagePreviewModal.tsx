@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Image, Modal, TouchableOpacity, Pressable, Text, Dimensions } from 'react-native';
-import { X, ZoomIn, Download } from 'lucide-react-native';
+import { View, Image, Modal, TouchableOpacity, Pressable, Text, Dimensions, Platform } from 'react-native';
+import { X, ZoomIn, Film } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 
@@ -9,42 +10,75 @@ interface Props {
   uri?: string | null;
   onClose: () => void;
   name?: string;
+  type?: 'image' | 'video';
 }
 
-export const ImagePreviewModal = ({ open, uri, onClose, name }: Props) => (
-  <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
-    <Pressable
-      style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', alignItems: 'center', justifyContent: 'center' }}
-      onPress={onClose}
-    >
-      {/* Close button */}
-      <TouchableOpacity
-        style={{ position: 'absolute', top: 52, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: 10 }}
+const isVideo = (uri: string, type?: string) => {
+  if (type === 'video') return true;
+  return /\.(mp4|mov|m4v|webm)$/i.test(uri) || uri.includes('youtube.com') || uri.includes('youtu.be');
+};
+
+export const ImagePreviewModal = ({ open, uri, onClose, name, type }: Props) => {
+  const showVideo = uri ? isVideo(uri, type) : false;
+
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }}
         onPress={onClose}
       >
-        <X size={22} color="white" />
-      </TouchableOpacity>
+        {/* Header */}
+        <View style={{ position: 'absolute', top: 40, left: 0, right: 0, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
+          <View style={{ flex: 1 }}>
+            {name && (
+              <Text numberOfLines={1} style={{ color: 'white', fontSize: 16, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium' }}>
+                {name.replace('\n', ' ')}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 8, marginLeft: 16 }}
+            onPress={onClose}
+          >
+            <X size={24} color="white" />
+          </TouchableOpacity>
+        </View>
 
-      {/* Image */}
-      <Pressable onPress={e => e.stopPropagation?.()}>
-        <View style={{ borderRadius: 20, overflow: 'hidden', maxWidth: SW - 40, maxHeight: SH * 0.75 }}>
+        {/* Content */}
+        <Pressable onPress={e => e.stopPropagation?.()} style={{ width: SW, height: SH * 0.7, alignItems: 'center', justifyContent: 'center' }}>
           {uri ? (
-            <Image
-              source={{ uri }}
-              style={{ width: SW - 40, height: SH * 0.65 }}
-              resizeMode="contain"
-            />
+            showVideo ? (
+              <View style={{ width: SW, height: SW * (9 / 16), backgroundColor: 'black' }}>
+                <WebView
+                  source={{ uri: uri.includes('youtube.com') && !uri.includes('embed') ? uri.replace('watch?v=', 'embed/') : uri }}
+                  style={{ flex: 1, backgroundColor: 'black' }}
+                  allowsFullscreenVideo
+                  javaScriptEnabled
+                />
+              </View>
+            ) : (
+              <Image
+                source={{ uri }}
+                style={{ width: SW - 20, height: SH * 0.65 }}
+                resizeMode="contain"
+              />
+            )
           ) : (
             <View style={{ width: 240, height: 200, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
               <ZoomIn size={48} color="#475569" />
-              <Text style={{ color: '#64748b', marginTop: 12, fontWeight: '600' }}>No image</Text>
+              <Text style={{ color: '#64748b', marginTop: 12, fontWeight: '600' }}>No content available</Text>
             </View>
           )}
-        </View>
-        {name && (
-          <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 12, fontSize: 13, fontWeight: '600' }}>{name}</Text>
+        </Pressable>
+
+        {/* Bottom indicator for video */}
+        {showVideo && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20 }}>
+            <Film size={16} color="rgba(255,255,255,0.5)" />
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600' }}>Video Preview</Text>
+          </View>
         )}
       </Pressable>
-    </Pressable>
-  </Modal>
-);
+    </Modal>
+  );
+};

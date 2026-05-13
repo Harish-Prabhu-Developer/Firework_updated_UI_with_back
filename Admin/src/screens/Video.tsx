@@ -20,8 +20,8 @@ export const useVideoQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const query = useQuery({ queryKey: ['videos'], queryFn: async () => { const { data } = await api.get('/videos'); return data.data ?? []; } });
-  const productsQuery = useQuery<Product[]>({ queryKey: ['products-list'], queryFn: async () => { const { data } = await api.get('/products?limit=999999&isActive=true'); return data.data?.data ?? []; } });
+  const query = useQuery({ queryKey: ['videos'], queryFn: async () => { const { data } = await api.get('/videos?limit=999999'); return data.data ?? []; } });
+  const productsQuery = useQuery<Product[]>({ queryKey: ['products-list'], queryFn: async () => { const { data } = await api.get('/products?limit=999999&isActive=true'); return data.data ?? []; } });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/videos/${id}`, payload) : api.post('/videos', payload),

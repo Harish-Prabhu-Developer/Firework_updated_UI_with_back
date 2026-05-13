@@ -3,6 +3,7 @@ import {
     createInvoice,
     getAllInvoices,
     getInvoiceById,
+    getInvoiceToken,
     updateInvoice,
     getInvoicePDF,
     deleteInvoice,
@@ -16,6 +17,7 @@ router.use(authenticate);
 
 router.post('/', checkPermission('invoices', 'create'), createInvoice);
 router.get('/', checkPermission('invoices', 'read'), getAllInvoices);
+router.get('/:id/token', checkPermission('invoices', 'read'), getInvoiceToken);
 router.get('/:id', checkPermission('invoices', 'read'), getInvoiceById);
 router.put('/:id', checkPermission('invoices', 'update'), updateInvoice);
 router.get('/pdf/:encryptedId', getInvoicePDF);

@@ -41,7 +41,7 @@ const formatCurrency = (value: unknown) => {
     return `&#8377;${safeValue.toFixed(2)}`;
 };
 
-export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, _shopInfo: any, isCopy: boolean = false) => {
+export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInfo: any, isCopy: boolean = false) => {
     const {
         orderNumber,
         createdAt,
@@ -361,18 +361,17 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, _shopIn
                         </div>
                     </div>
                     <div class="brand-section">
-                        <h1>${SHOP_DETAILS.shopName}</h1>
+                        <h1>${shopInfo.shopName || SHOP_DETAILS.shopName}</h1>
                         <p class="brand-legal">${SHOP_DETAILS.legalName}</p>
-                        <p class="brand-line">${SHOP_DETAILS.addressLine1}</p>
-                        <p class="brand-line">${SHOP_DETAILS.addressLine2}</p>
-                        <p class="brand-line">${SHOP_DETAILS.addressLine3}</p>
-                        <p class="brand-line">${SHOP_DETAILS.addressLine4}</p>
-                        <p class="brand-contact">${SHOP_DETAILS.contactLine}</p>
-                        <p class="brand-gstin">${SHOP_DETAILS.gstinLine}</p>
+                        <p class="brand-line">${shopInfo.shopAddress || SHOP_DETAILS.addressLine1}</p>
+                        <p class="brand-contact">Ph: ${shopInfo.shopPhone || SHOP_DETAILS.contactLine}</p>
+                        ${shopInfo.whatsappNum ? `<p class="brand-contact">WhatsApp: ${shopInfo.whatsappNum}</p>` : ''}
+                        ${shopInfo.shopEmail ? `<p class="brand-line">Email: ${shopInfo.shopEmail}</p>` : ''}
+                        <p class="brand-gstin">${shopInfo.shopGst ? `GSTIN: ${shopInfo.shopGst}` : SHOP_DETAILS.gstinLine}</p>
                     </div>
                 </div>
                 <div class="header-right">
-                    <img src="${qrCodeDataUrl}" class="qr-code" />
+                    ${qrCodeDataUrl ? `<img src="${qrCodeDataUrl}" class="qr-code" />` : ''}
                     <div class="invoice-meta">
                         <div class="invoice-title">${isCopy ? 'Order Receipt Copy' : 'Order Receipt'}</div>
                         <div class="meta-item">No: <strong>${orderNumber}</strong></div>

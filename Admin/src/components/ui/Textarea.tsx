@@ -6,16 +6,17 @@ import { Fonts, Radius } from '../../styles/globalStyles';
 
 interface Props extends TextInputProps {
   label?: string;
+  required?: boolean;
   error?: string;
   className?: string;
   rows?: number;
 }
 
-export const Textarea = ({ label, error, className, rows = 4, style, ...props }: Props) => (
+export const Textarea = ({ label, required, error, className, rows = 4, style, ...props }: Props) => (
   <View>
     {label && (
       <Text style={{ fontFamily: Fonts.body }} className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5">
-        {label}
+        {label} {required && <Text className="text-destructive">*</Text>}
       </Text>
     )}
     <TextInput

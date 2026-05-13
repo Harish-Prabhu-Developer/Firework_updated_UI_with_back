@@ -19,10 +19,3 @@ export const NoPermission = () => {
   );
 };
 
-export const Permissions = () => (
-  <View className="flex-1 bg-background items-center justify-center px-8">
-    <Lock size={48} color="#4f46e5" />
-    <Text className="text-lg font-black text-foreground mt-4">Permissions</Text>
-    <Text className="text-sm text-muted-foreground mt-2 text-center">Manage permissions via the Roles screen → Permissions button.</Text>
-  </View>
-);

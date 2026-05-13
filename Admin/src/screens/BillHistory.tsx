@@ -26,14 +26,36 @@ interface Invoice {
 }
 
 // Slice-like hook for Bill operations
-export const useBillQueries = () => {
+export const useBillQueries = (page = 1, limit = 50) => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const query = useQuery({ queryKey: ['invoices'], queryFn: async () => { const { data } = await api.get('/invoices?limit=999999'); return data.data?.data ?? []; } });
+  const query = useQuery({
+    queryKey: ['invoices', page, limit],
+    queryFn: async () => {
+      const { data } = await api.get(`/invoices?page=${page}&limit=${limit}`);
+      return {
+        items: (data.data ?? []) as Invoice[],
+        pagination: data.pagination ?? { page, limit, total: 0, totalPages: 1 },
+      };
+    },
+  });
 
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/invoices/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); toast.success('Invoice deleted'); } });
-  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.delete('/invoices/bulk', { data: { ids } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); toast.success('Deleted'); } });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/invoices/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice deleted');
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => api.post('/invoices/bulk-delete', { ids }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Deleted');
+    },
+  });
 
   return { query, remove: deleteMutation, bulkRemove: bulkDeleteMutation };
 };
@@ -41,15 +63,19 @@ export const useBillQueries = () => {
 export default function BillHistory() {
   const toast = useToast();
   const navigation = useNavigation<any>();
-  const { query, remove, bulkRemove } = useBillQueries();
-  const all = query.data || [];
+
+  const [page, setPage] = useState(1);
+  const PAGE_LIMIT = 50;
+
+  const { query, remove, bulkRemove } = useBillQueries(page, PAGE_LIMIT);
+  const all = query.data?.items || [];
+  const pagination = query.data?.pagination;
   const isLoading = query.isLoading;
 
   const [search, setSearch] = useState(''); const [filterPayment, setFilterPayment] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set<string>());
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null); const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [pdfTemplate, setPdfTemplate] = useState<'1' | '2'>('1');
 
   const data = useMemo(() => {
     let d = all as Invoice[];
@@ -120,6 +146,32 @@ export default function BillHistory() {
         exportColumns={[{ key: 'invoiceNumber', label: 'Invoice #' }, { key: 'paymentMethod', label: 'Payment' }, { key: 'totalAmount', label: 'Total' }, { key: 'createdAt', label: 'Date' }]}
         renderCard={renderCard}
       />
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <View className="flex-row items-center justify-between px-4 py-3 border-t border-border bg-card">
+          <TouchableOpacity
+            disabled={page <= 1}
+            onPress={() => setPage(p => Math.max(1, p - 1))}
+            className={`px-4 py-2 rounded-xl border ${page <= 1 ? 'border-border opacity-40' : 'border-primary bg-primary/10'}`}
+          >
+            <Text className={`text-sm font-bold ${page <= 1 ? 'text-muted-foreground' : 'text-primary'}`} style={{ fontFamily: Fonts.body }}>← Prev</Text>
+          </TouchableOpacity>
+
+          <View className="items-center">
+            <Text className="text-xs font-black text-foreground" style={{ fontFamily: Fonts.body }}>Page {pagination.page} of {pagination.totalPages}</Text>
+            <Text className="text-[10px] text-muted-foreground" style={{ fontFamily: Fonts.body }}>{pagination.total} total invoices</Text>
+          </View>
+
+          <TouchableOpacity
+            disabled={page >= pagination.totalPages}
+            onPress={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+            className={`px-4 py-2 rounded-xl border ${page >= pagination.totalPages ? 'border-border opacity-40' : 'border-primary bg-primary/10'}`}
+          >
+            <Text className={`text-sm font-bold ${page >= pagination.totalPages ? 'text-muted-foreground' : 'text-primary'}`} style={{ fontFamily: Fonts.body }}>Next →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Invoice Detail */}
       <FormModal open={!!detailInvoice} onClose={() => setDetailInvoice(null)} title={`Invoice: ${detailInvoice?.invoiceNumber}`} subtitle={`Customer: ${detailInvoice?.customer?.name}`}>

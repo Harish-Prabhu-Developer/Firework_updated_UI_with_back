@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import headerBg from "@/assets/header_contact_bg.png";
 import rockets from "@/assets/rockets.jpg"; // For fallback
-import { API_BASE_URL } from "@/services/api";
+import { API_BASE_URL, settingsService } from "@/services/api";
 import axios from "axios";
 
 interface CartItem {
@@ -53,7 +53,6 @@ declare global {
   }
 }
 
-const MIN_ENQUIRY_AMOUNT = 3000;
 const formatCurrency = (value: number) => `\u20B9${Math.max(0, value).toLocaleString("en-IN")}`;
 const cleanPhoneInput = (value: string) => value.replace(/\D/g, "").slice(0, 10);
 const formatPhoneDisplay = (value: string) => {
@@ -76,6 +75,23 @@ const Checkout = () => {
   const routeState = (location.state as CheckoutRouteState) || {};
   const initialCartItems = Array.isArray(routeState.cartItems) ? routeState.cartItems : [];
   const [checkoutItems, setCheckoutItems] = useState<CartItem[]>(initialCartItems);
+  const [minOrder, setMinOrder] = useState(3000);
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await settingsService.getSettings();
+        if (res.success && res.data) {
+          setMinOrder(res.data.minimumOrder ?? 3000);
+          setIsStoreOpen(res.data.salesStatus ?? true);
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings", err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const savedEstimate = useMemo(() => {
     return null;
@@ -99,8 +115,8 @@ const Checkout = () => {
   const finalTotalAmount = hasLiveCart ? liveTotalAmount : routeTotalAmount;
   const finalSubTotal = hasLiveCart ? liveTotalAmount : routeSubTotal;
 
-  const isBelowMinimum = finalTotalAmount < MIN_ENQUIRY_AMOUNT;
-  const minimumShortfall = Math.max(0, MIN_ENQUIRY_AMOUNT - finalTotalAmount);
+  const isBelowMinimum = finalTotalAmount < minOrder;
+  const minimumShortfall = Math.max(0, minOrder - finalTotalAmount);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
@@ -226,9 +242,14 @@ const Checkout = () => {
 
     const newErrors: Record<string, string> = {};
 
+    if (!isStoreOpen) {
+      toast.error("Store is currently not accepting orders. Please try again later.");
+      return;
+    }
+
     if (isBelowMinimum) {
       toast.error(
-        `Minimum enquiry is ${formatCurrency(MIN_ENQUIRY_AMOUNT)}. Add ${formatCurrency(
+        `Minimum enquiry is ${formatCurrency(minOrder)}. Add ${formatCurrency(
           minimumShortfall
         )} more.`
       );
@@ -527,9 +548,14 @@ const Checkout = () => {
                     <span className="text-primary">{formatCurrency(finalTotalAmount)}</span>
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    Minimum Enquiry: {formatCurrency(MIN_ENQUIRY_AMOUNT)}
+                    Minimum Enquiry: {formatCurrency(minOrder)}
                   </p>
-                  {isBelowMinimum && (
+                  {!isStoreOpen && (
+                    <p className="text-xs font-bold text-festive-ruby bg-festive-ruby/10 p-2 rounded-lg mt-2">
+                      STORE CLOSED: We are currently not accepting enquiries.
+                    </p>
+                  )}
+                  {isBelowMinimum && isStoreOpen && (
                     <p className="text-xs font-bold text-festive-ruby">
                       Add {formatCurrency(minimumShortfall)} more to place enquiry.
                     </p>
@@ -547,8 +573,10 @@ const Checkout = () => {
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Processing...
                       </>
+                    ) : !isStoreOpen ? (
+                      <>Store Currently Closed</>
                     ) : isBelowMinimum ? (
-                      <>Minimum {formatCurrency(MIN_ENQUIRY_AMOUNT)} Required</>
+                      <>Minimum {formatCurrency(minOrder)} Required</>
                     ) : (
                       <>
                         <CheckCircle className="w-4 h-4" />
@@ -571,25 +599,30 @@ const Checkout = () => {
           <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">Total</p>
             <p className="text-lg font-black text-primary">{formatCurrency(finalTotalAmount)}</p>
-            {isBelowMinimum && (
+            {isBelowMinimum && isStoreOpen && (
               <p className="text-[10px] font-bold text-festive-ruby">
-                Min {formatCurrency(MIN_ENQUIRY_AMOUNT)}
+                Min {formatCurrency(minOrder)}
               </p>
+            )}
+            {!isStoreOpen && (
+              <p className="text-[10px] font-bold text-festive-ruby uppercase tracking-wider">Store Closed</p>
             )}
           </div>
 
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || isBelowMinimum}
+            disabled={isSubmitting || isBelowMinimum || !isStoreOpen}
             className="h-11 rounded-xl font-black text-xs uppercase tracking-widest px-5"
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
+            ) : !isStoreOpen ? (
+              <>Closed</>
             ) : isBelowMinimum ? (
-              <>Minimum Required</>
+              <>Min Req.</>
             ) : (
               <>
-                Place Enquiry
+                Enquiry
                 <CheckCircle className="w-4 h-4" />
               </>
             )}

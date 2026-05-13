@@ -60,6 +60,7 @@ interface FormState {
   mrp: string;
   sellingPrice: string;
   rank: string;
+  initialStock: string;
   isActive: boolean;
   imageUrl: string;
 }
@@ -73,6 +74,7 @@ const EMPTY_FORM: FormState = {
   mrp: '',
   sellingPrice: '',
   rank: '0',
+  initialStock: '0',
   isActive: true,
   imageUrl: ''
 };
@@ -188,7 +190,7 @@ export const useProductQueries = () => {
   });
 
   const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/products/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Deleted'); } });
-  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.delete('/products/bulk', { data: { ids } }), onSuccess: (_, ids) => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success(`${ids.length} deleted`); } });
+  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/products/bulk-delete', { ids }), onSuccess: (_, ids) => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success(`${ids.length} deleted`); } });
 
   return {
     query: productsQuery,
@@ -242,6 +244,7 @@ export default function Product() {
       mrp: p.mrp,
       sellingPrice: p.sellingPrice,
       rank: String(p.rank),
+      initialStock: String(p.stock?.quantity ?? 0),
       isActive: p.isActive,
       imageUrl: p.image ?? ''
     });
@@ -330,6 +333,7 @@ export default function Product() {
       payload: {
         ...form,
         rank: Number(form.rank),
+        quantity: Number(form.initialStock),
         image: form.imageUrl,
         isActive: Boolean(form.isActive)
       }
@@ -653,7 +657,7 @@ export default function Product() {
             />
           </View>
 
-          {/* Rank & Status Grid */}
+          {/* Rank & Stock Grid */}
           <View className="flex-row" style={{ gap: 16 }}>
             <View style={{ flex: 1 }}>
               <Input
@@ -661,59 +665,70 @@ export default function Product() {
                 required
                 value={form.rank}
                 onChangeText={v => setForm({ ...form, rank: v })}
-                placeholder="Unique rank number"
-                placeholderTextColor={productUi.mutedForeground}
+                placeholder="Unique rank"
                 keyboardType="numeric"
-                className="px-3"
                 style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: productUi.foreground, fontSize: 13, fontWeight: '700', marginBottom: 6, fontFamily: Fonts.body }}>
-                Status
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setForm(prev => ({ ...prev, isActive: !prev.isActive }))}
-                className="flex-row items-center justify-between"
-                style={{
-                  height: 48,
-                  borderRadius: Radius.lg,
-                  backgroundColor: form.isActive ? productUi.activeSoft : productUi.inactiveSoft,
-                  paddingHorizontal: 12,
-                  borderWidth: 1,
-                  borderColor: form.isActive ? '#bde8cc' : '#f4d49e',
-                }}
-              >
-                <View className="flex-row items-center" style={{ gap: 8 }}>
-                  <View
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: Radius.full,
-                      backgroundColor: form.isActive ? productUi.active : productUi.inactive,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      color: form.isActive ? productUi.active : productUi.inactive,
-                      fontFamily: Fonts.body,
-                      fontSize: 14,
-                      fontWeight: '800',
-                    }}
-                  >
-                    {form.isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
-                <Switch
-                  value={form.isActive}
-                  onValueChange={value => setForm(prev => ({ ...prev, isActive: value }))}
-                  trackColor={{ false: '#f4d49e', true: '#9bddb3' }}
-                  thumbColor={form.isActive ? productUi.active : productUi.inactive}
-                  ios_backgroundColor="#f4d49e"
-                />
-              </TouchableOpacity>
+              <Input
+                label="Initial Stock"
+                required
+                value={form.initialStock}
+                onChangeText={v => setForm({ ...form, initialStock: v })}
+                placeholder="0"
+                keyboardType="numeric"
+                style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
+              />
             </View>
+          </View>
+
+          {/* Status */}
+          <View>
+            <Text style={{ color: productUi.foreground, fontSize: 13, fontWeight: '700', marginBottom: 6, fontFamily: Fonts.body }}>
+              Status
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setForm(prev => ({ ...prev, isActive: !prev.isActive }))}
+              className="flex-row items-center justify-between"
+              style={{
+                height: 48,
+                borderRadius: Radius.lg,
+                backgroundColor: form.isActive ? productUi.activeSoft : productUi.inactiveSoft,
+                paddingHorizontal: 12,
+                borderWidth: 1,
+                borderColor: form.isActive ? '#bde8cc' : '#f4d49e',
+              }}
+            >
+              <View className="flex-row items-center" style={{ gap: 8 }}>
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: Radius.full,
+                    backgroundColor: form.isActive ? productUi.active : productUi.inactive,
+                  }}
+                />
+                <Text
+                  style={{
+                    color: form.isActive ? productUi.active : productUi.inactive,
+                    fontFamily: Fonts.body,
+                    fontSize: 14,
+                    fontWeight: '800',
+                  }}
+                >
+                  {form.isActive ? 'Active' : 'Inactive'}
+                </Text>
+              </View>
+              <Switch
+                value={form.isActive}
+                onValueChange={value => setForm(prev => ({ ...prev, isActive: value }))}
+                trackColor={{ false: '#f4d49e', true: '#9bddb3' }}
+                thumbColor={form.isActive ? productUi.active : productUi.inactive}
+                ios_backgroundColor="#f4d49e"
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </FormModal>

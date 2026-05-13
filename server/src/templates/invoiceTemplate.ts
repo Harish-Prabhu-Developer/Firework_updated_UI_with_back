@@ -252,7 +252,7 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
                     <p>Mob: ${shopInfo.shopPhone}${shopInfo.shopGst ? ` | GST: ${shopInfo.shopGst}` : ''}</p>
                 </div>
                 <div class="header-right">
-                    <img src="${qrCodeDataUrl}" class="qr-code" />
+                    ${qrCodeDataUrl ? `<img src="${qrCodeDataUrl}" class="qr-code" />` : ''}
                     <div class="invoice-meta">
                         <div class="invoice-title">Invoice</div>
                         <div class="meta-item">No: <strong>${invoiceNumber}</strong></div>

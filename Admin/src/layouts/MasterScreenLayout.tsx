@@ -153,6 +153,7 @@ export const MasterScreenLayout = ({
         paddingTop: topPadding,
         paddingHorizontal: horizontalPadding,
         paddingBottom: bottomPadding,
+        flex: scrollable ? undefined : 1,
       }}
     >
       {header}

@@ -29,3 +29,11 @@ export const productService = {
     return response.data.data;
   }
 };
+
+// Settings Service
+export const settingsService = {
+  getSettings: async () => {
+    const response = await apiClient.get("/settings");
+    return response.data;
+  }
+};

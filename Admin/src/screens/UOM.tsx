@@ -53,7 +53,7 @@ export const useUOMQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const query = useQuery({ queryKey: ['uoms'], queryFn: async () => { const { data } = await api.get('/uoms'); return data.data ?? []; } });
+  const query = useQuery({ queryKey: ['uoms'], queryFn: async () => { const { data } = await api.get('/uoms?limit=999999'); return data.data ?? []; } });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/uoms/${id}`, payload) : api.post('/uoms', payload),
