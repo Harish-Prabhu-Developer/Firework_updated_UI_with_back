@@ -261,10 +261,12 @@ export const generateInvoiceHTML2 = (invoiceData: any, qrCodeDataUrl: string, sh
                         <h4>Notes & Information</h4>
                         <p>${notes || 'Thank you for your business. Please keep this invoice for your records.'}</p>
                         
+                        ${qrCodeDataUrl ? `
                         <div class="qr-container">
                             <img src="${qrCodeDataUrl}" alt="Invoice QR">
                             <div style="font-size: 10px; margin-top: 5px; color: #999;">Scan to Verify</div>
                         </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="right-col">

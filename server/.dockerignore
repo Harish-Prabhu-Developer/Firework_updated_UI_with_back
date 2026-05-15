@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.git
+.gitignore
+Dockerfile
+.dockerignore
+npm-debug.log
+pnpm-debug.log
+yarn-debug.log
+yarn-error.log
+README.md
+uploads
+scratch
+.vscode
+.idea
+.gemini

@@ -16,7 +16,8 @@ import {
   ShoppingCart,
   Receipt,
   Image,
-  Video
+  Video,
+  User
 } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { Radius, Fonts } from '../styles/globalStyles';
@@ -26,6 +27,7 @@ const MENU_ITEMS = [
   { name: 'Dashboard', icon: LayoutDashboard, route: 'Dashboard' },
   { name: 'Orders', icon: ShoppingCart, route: 'Orders' },
   { name: 'Billing', icon: Receipt, route: 'Billing' },
+  { name: 'Customers', icon: User, route: 'Customers' },
   { name: 'Categories', icon: FolderTree, route: 'Categories' },
   { name: 'UOM', icon: Ruler, route: 'UOM' },
   { name: 'Products', icon: Package, route: 'Products' },

@@ -16,6 +16,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { ResponsiveNavigation } from './src/navigation/ResponsiveNavigation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ToastProvider } from './src/hooks/useToast';
+import { navigationRef } from './src/navigation/NavigationService';
 import Login from './src/screens/Login';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ShieldCheck } from 'lucide-react-native';
@@ -155,6 +156,7 @@ const linking: LinkingOptions<any> = {
           Media: 'media',
           Videos: 'videos',
           Settings: 'settings',
+          PdfViewer: 'pdf-viewer',
         },
       },
     },
@@ -185,6 +187,9 @@ const RootNavigator = () => {
     >
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="Main" component={ResponsiveNavigation} />
+      <Stack.Screen name="NoPermission" component={require('./src/screens/NoPermission').NoPermission} />
+      <Stack.Screen name="QrScan" component={require('./src/screens/QrScan').default} />
+      <Stack.Screen name="PdfViewer" component={require('./src/screens/PdfViewerScreen').default} />
     </Stack.Navigator>
   );
 };
@@ -205,7 +210,7 @@ const App = () => {
           <ToastProvider>
             <QueryClientProvider client={queryClient}>
               <PermissionProvider>
-                <NavigationContainer linking={linking}>
+                <NavigationContainer ref={navigationRef} linking={linking}>
                   <RootNavigator />
                 </NavigationContainer>
               </PermissionProvider>

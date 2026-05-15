@@ -1,9 +1,17 @@
 import { Link } from "react-router-dom";
-import { Facebook, Linkedin, Mail, MapPin, Phone, Twitter } from "lucide-react";
+import { Facebook, Instagram, Mail, MapPin, Phone } from "lucide-react";
 import logo from "@/assets/logo.png";
-import { ADDRESS_LINES } from "@/lib/businessInfo";
+import { useShopSettings } from "@/lib/businessInfo";
 
 const Footer = () => {
+  const { settings } = useShopSettings();
+  const phone = settings.shopPhone || "+91 81442 71571";
+  const phoneHref = `tel:+${(settings.whatsappNum || "918144271571").replace(/\D/g, "")}`;
+  const email = settings.shopEmail || "crackerskingdom26@gmail.com";
+  const gst = settings.shopGst || "30239HHJ343HG393";
+  const facebook = settings.socialMedias?.facebook || "#";
+  const instagram = settings.socialMedias?.instagram || "#";
+
   return (
     <footer className="bg-footer text-footer-foreground">
       <div className="max-w-[1400px] mx-auto section-padding py-10">
@@ -34,15 +42,24 @@ const Footer = () => {
             </div>
 
             <div className="flex gap-3 pt-1">
-              {[Facebook, Linkedin, Twitter].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-9 h-9 rounded-full bg-card/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-                >
-                  <Icon size={16} />
-                </a>
-              ))}
+              <a
+                href={facebook}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full bg-card/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                aria-label="Facebook"
+              >
+                <Facebook size={16} />
+              </a>
+              <a
+                href={instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full bg-card/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                aria-label="Instagram"
+              >
+                <Instagram size={16} />
+              </a>
             </div>
           </div>
 
@@ -73,34 +90,28 @@ const Footer = () => {
             <div className="space-y-6">
               <div className="flex items-start gap-2 text-sm">
                 <MapPin size={16} className="text-primary mt-0.5 shrink-0" />
-                <p className="leading-relaxed">
-                  {ADDRESS_LINES.map((line) => (
-                    <span key={line} className="block">
-                      {line}
-                    </span>
-                  ))}
-                </p>
+                <p className="leading-relaxed">{settings.shopAddress}</p>
               </div>
 
               <div className="space-y-4">
                 <a
-                  href="mailto:crackerskingdom26@gmail.com"
+                  href={`mailto:${email}`}
                   className="flex items-start gap-2 text-sm hover:text-primary transition-colors group"
                 >
                   <Mail size={15} className="text-primary shrink-0 mt-0.5" />
-                  <p className="wrap-break-word leading-snug">crackerskingdom26@gmail.com</p>
+                  <p className="wrap-break-word leading-snug">{email}</p>
                 </a>
 
                 <a
-                  href="tel:+918144271571"
+                  href={phoneHref}
                   className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
                 >
                   <Phone size={15} className="text-festive-green shrink-0" />
-                  <span>+91 81442 71571</span>
+                  <span>{phone}</span>
                 </a>
               </div>
 
-              <p className="text-xs font-bold text-card">GST IN :30239HHJ343HG393</p>
+              <p className="text-xs font-bold text-card">GST IN: {gst}</p>
             </div>
           </div>
 
@@ -157,7 +168,12 @@ const Footer = () => {
 
           <span>
             Designed by{" "}
-            <a href="#" className="text-primary underline hover:opacity-80 transition-opacity">
+            <a
+              href={`https://wa.me/+918438009220?text=${encodeURIComponent("Hello, I would like to talk about Software development. Could you please share more details?")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline hover:opacity-80 transition-opacity"
+            >
               Harish Prabhu
             </a>
           </span>

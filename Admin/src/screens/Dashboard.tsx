@@ -10,7 +10,8 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { LineChart, PieChart } from 'react-native-chart-kit';
 import { Card } from '../components/ui/Card';
 import { useResponsive } from '../hooks/useResponsive';
 import { cn } from '../lib/utils';
@@ -42,12 +43,7 @@ const QUICK_ACTIONS = [
   { label: 'Scan QR', screen: 'QrScan', color: 'bg-info' },
 ];
 
-const SYSTEM_INFO = [
-  { label: 'Platform', value: 'React Native CLI' },
-  { label: 'Web Engine', value: 'Webpack 5' },
-  { label: 'Database', value: 'PostgreSQL + Drizzle' },
-  { label: 'API', value: 'Express.js + TypeScript' },
-];
+// Dashboard data fetched via API
 
 const getStatCount = (response: any): number => {
   if (typeof response?.pagination?.total === 'number') return response.pagination.total;
@@ -90,7 +86,7 @@ const StatCard = ({
 export const useDashboardQueries = () => {
   const queries = useQueries({
     queries: STAT_CONFIG.map((item) => ({
-      queryKey: [item.qk],
+      queryKey: [item.qk, 'stat'],
       queryFn: async () => {
         try {
           const { data } = await api.get(`/${item.qk}?limit=1`);
@@ -110,6 +106,25 @@ export default function Dashboard() {
   const nav = useNavigation<any>();
 
   const queries = useDashboardQueries();
+
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['dashboard', 'analytics'],
+    queryFn: async () => {
+      const { data } = await api.get('/analytics');
+      return data.data;
+    }
+  });
+
+  const chartConfig = {
+    backgroundGradientFrom: colors.card,
+    backgroundGradientTo: colors.card,
+    color: (opacity = 1) => `rgba(29, 158, 117, ${opacity})`, // colors.primary equivalent
+    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`, // muted-foreground
+    strokeWidth: 2,
+    barPercentage: 0.5,
+    useShadowColorFromDataset: false,
+    decimalPlaces: 0,
+  };
 
   return (
     <ScrollView
@@ -150,33 +165,59 @@ export default function Dashboard() {
       </Card>
 
       <View className="flex-row flex-wrap gap-4">
-        <Card className="flex-1 min-w-[280px]">
+        {/* Monthly Revenue Line Chart */}
+        <Card className="flex-1 min-w-[320px]">
           <View className="px-4 py-3 border-b border-border flex-row items-center gap-2">
             <TrendingUp size={16} color={colors.primary} />
-            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.display }}>Platform</Text>
+            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.display }}>Monthly Revenue</Text>
           </View>
-          <View className="p-4 items-center py-8">
-            <View style={{ borderRadius: Radius.full, borderColor: colors.primary + '20' }} className="w-24 h-24 border-8 items-center justify-center">
-              <Text className="text-xl font-black text-primary" style={{ fontFamily: Fonts.display }}>CK</Text>
-            </View>
-            <Text className="text-sm text-muted-foreground mt-4 text-center font-medium" style={{ fontFamily: Fonts.body }}>
-              Crackers Kingdom Admin{'\n'}ERP & Billing System
-            </Text>
+          <View className="p-2 items-center">
+            {analytics?.monthlyRevenue ? (
+              <LineChart
+                data={{
+                  labels: analytics.monthlyRevenue.labels,
+                  datasets: [{ data: analytics.monthlyRevenue.data }],
+                }}
+                width={isMobile ? 320 : 450}
+                height={220}
+                chartConfig={chartConfig}
+                bezier
+                style={{ borderRadius: 12, marginVertical: 8 }}
+                yAxisLabel="₹"
+                withInnerLines={false}
+              />
+            ) : (
+              <View className="h-[220px] items-center justify-center">
+                <Text className="text-muted-foreground text-xs">No revenue data available</Text>
+              </View>
+            )}
           </View>
         </Card>
 
-        <Card className="flex-1 min-w-[280px]">
+        {/* Payment Method Pie Chart */}
+        <Card className="flex-1 min-w-[320px]">
           <View className="px-4 py-3 border-b border-border flex-row items-center gap-2">
             <BarChart3 size={16} color={colors.primary} />
-            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.display }}>System Info</Text>
+            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.display }}>Payment Methods</Text>
           </View>
-          <View className="p-4 gap-3">
-            {SYSTEM_INFO.map((item) => (
-              <View key={item.label} className="flex-row items-center justify-between py-1.5 border-b border-border/40">
-                <Text className="text-xs text-muted-foreground font-medium" style={{ fontFamily: Fonts.body }}>{item.label}</Text>
-                <Text className="text-xs font-bold text-foreground" style={{ fontFamily: Fonts.body }}>{item.value}</Text>
+          <View className="p-2 items-center">
+            {analytics?.paymentDistribution ? (
+              <PieChart
+                data={analytics.paymentDistribution}
+                width={isMobile ? 320 : 400}
+                height={220}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                center={[10, 0]}
+                absolute
+              />
+            ) : (
+              <View className="h-[220px] items-center justify-center">
+                <Text className="text-muted-foreground text-xs">No payment data available</Text>
               </View>
-            ))}
+            )}
           </View>
         </Card>
       </View>

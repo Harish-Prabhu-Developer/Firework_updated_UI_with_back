@@ -50,7 +50,7 @@ export const TableView = <T extends Record<string, any>>({
       decelerationRate="fast"
       contentContainerStyle={{ minWidth: '100%' }}
     >
-      <View style={{ width: '100%', minWidth: minTableWidth }}>
+      <View style={{ width: minTableWidth }}>
         {/* Header */}
         <View className="flex-row bg-slate-50 border-b-2 border-border items-center">
           {onSelectAll && (

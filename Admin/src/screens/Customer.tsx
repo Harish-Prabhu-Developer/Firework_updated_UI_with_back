@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Pencil, Trash2, Mail, MapPin } from 'lucide-react-native';
+import { Pencil, Trash2, Mail, MapPin, Calendar } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
 import { AdaptiveTable } from '../components/AdaptiveTable';
@@ -12,6 +12,7 @@ import api from '../api/api';
 import { Input } from '../components/ui/Input';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
+import { formatIdentityDisplay, cleanIdentityInput } from '../utils/Formatter';
 
 interface Customer { id: string; name: string; phone: string; email?: string; address?: string; createdAt: string; }
 
@@ -20,16 +21,23 @@ export const useCustomerQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const query = useQuery({ queryKey: ['customers'], queryFn: async () => { const { data } = await api.get('/customers?limit=999999'); return data.data?.data ?? []; } });
+  const query = useQuery({ 
+    queryKey: ['customers', 'list'], 
+    queryFn: async () => { 
+      const { data: res } = await api.get('/customers?limit=999999'); 
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return (list ?? []) as Customer[];
+    } 
+  });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/customers/${id}`, payload) : api.post('/customers', payload),
-    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['customers'] }); toast.success(variables.id ? 'Updated' : 'Created'); },
+    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['customers', 'list'] }); toast.success(variables.id ? 'Updated' : 'Created'); },
     onError: (e) => toast.apiError(e, 'Failed'),
   });
 
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/customers/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['customers'] }); toast.success('Deleted'); } });
-  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.delete('/customers/bulk', { data: { ids } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['customers'] }); toast.success('Deleted'); } });
+  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/customers/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['customers', 'list'] }); toast.success('Deleted'); } });
+  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/customers/bulk-delete', { ids }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['customers', 'list'] }); toast.success('Deleted'); } });
 
   return { query, save: saveMutation, remove: deleteMutation, bulkRemove: bulkDeleteMutation };
 };
@@ -55,9 +63,10 @@ export default function Customer() {
 
   const columns: Column<Customer>[] = [
     { key: 'name', label: 'Name', width: 180, sortable: true, render: (c) => <View className="flex-row items-center gap-2"><View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center"><Text className="text-xs font-black text-primary" style={{ fontFamily: Fonts.body }}>{c.name[0]?.toUpperCase()}</Text></View><Text className="font-bold text-sm" style={{ fontFamily: Fonts.body }}>{c.name}</Text></View> },
-    { key: 'phone', label: 'Phone', width: 140, render: (c) => <Text className="text-sm font-mono">{c.phone}</Text> },
+    { key: 'phone', label: 'Phone', width: 140, render: (c) => <Text className="text-sm font-mono">{formatIdentityDisplay(c.phone)}</Text> },
     { key: 'email', label: 'Email', width: 200, render: (c) => <Text className="text-sm text-muted-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{c.email || '—'}</Text> },
     { key: 'address', label: 'Address', width: 200, render: (c) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={2}>{c.address || '—'}</Text> },
+    { key: 'createdAt', label: 'Joined Date', width: 120, render: (c) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{new Date(c.createdAt).toLocaleDateString('en-IN')}</Text> },
     { key: 'actions', label: 'Actions', width: 90, render: (c) => <View className="flex-row gap-1"><TouchableOpacity onPress={() => openEdit(c)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(c.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
   ];
 
@@ -65,10 +74,14 @@ export default function Customer() {
     <View style={globalStyles.card}>
       <View className="flex-row items-center gap-3 mb-4">
         <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center"><Text className="text-lg font-black text-primary" style={{ fontFamily: Fonts.display }}>{c.name[0]?.toUpperCase()}</Text></View>
-        <View className="flex-1"><Text className="text-base font-black text-foreground" style={{ fontFamily: Fonts.display }}>{c.name}</Text><Text className="text-xs text-muted-foreground font-mono mt-0.5">{c.phone}</Text></View>
+        <View className="flex-1"><Text className="text-base font-black text-foreground" style={{ fontFamily: Fonts.display }}>{c.name}</Text><Text className="text-xs text-muted-foreground font-mono mt-0.5">{formatIdentityDisplay(c.phone)}</Text></View>
       </View>
       {c.email && <View className="flex-row items-center gap-2 mb-2"><Mail size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{c.email}</Text></View>}
-      {c.address && <View className="flex-row items-center gap-2 mb-4"><MapPin size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground flex-1" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{c.address}</Text></View>}
+      {c.address && <View className="flex-row items-center gap-2 mb-2"><MapPin size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground flex-1" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{c.address}</Text></View>}
+      <View className="flex-row items-center gap-2 mb-4">
+        <Calendar size={12} color={colors.mutedForeground} />
+        <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>Joined: {new Date(c.createdAt).toLocaleDateString('en-IN')}</Text>
+      </View>
       <View className="flex-row border-t border-border/40 pt-2">
         <TouchableOpacity onPress={() => openEdit(c)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Edit</Text></TouchableOpacity>
         <TouchableOpacity onPress={() => setDeleteId(c.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
@@ -90,10 +103,10 @@ export default function Customer() {
         footer={<View className="flex-row gap-3"><TouchableOpacity onPress={() => setFormOpen(false)} className="flex-1 h-11 rounded-xl border border-border items-center justify-center"><Text className="text-sm font-bold" style={{ fontFamily: Fonts.body }}>Cancel</Text></TouchableOpacity><TouchableOpacity onPress={() => save.mutate({ id: editItem?.id, payload: form }, { onSuccess: () => setFormOpen(false) })} disabled={save.isPending} className="flex-1 h-11 rounded-xl bg-primary items-center justify-center"><Text className="text-sm font-bold text-primary-foreground" style={{ fontFamily: Fonts.body }}>{save.isPending ? 'Saving…' : editItem ? 'Update' : 'Create'}</Text></TouchableOpacity></View>}
       >
         <View className="gap-4">
-          <Input label="Full Name *" value={form.name} onChangeText={v => setForm({ ...form, name: v })} placeholder="Customer name" />
-          <Input label="Phone *" value={form.phone} onChangeText={v => setForm({ ...form, phone: v })} keyboardType="phone-pad" placeholder="+91 XXXXX XXXXX" />
-          <Input label="Email" value={form.email} onChangeText={v => setForm({ ...form, email: v })} keyboardType="email-address" placeholder="Optional" />
-          <Input label="Address" value={form.address} onChangeText={v => setForm({ ...form, address: v })} placeholder="Street, City, State" multiline />
+          <Input label="Full Name" required={true} value={form.name} onChangeText={v => setForm({ ...form, name: v })} placeholder="Customer name" />
+          <Input label="Phone" required={true} value={formatIdentityDisplay(form.phone)} onChangeText={v => setForm({ ...form, phone: cleanIdentityInput(v) })} keyboardType="phone-pad" placeholder="+91 XXXXX XXXXX" />
+          <Input label="Email" required={true} value={form.email} onChangeText={v => setForm({ ...form, email: v })} keyboardType="email-address" placeholder="Enter email address" />
+          <Input label="Address" required={true} value={form.address} onChangeText={v => setForm({ ...form, address: v })} placeholder="Street, City, State" multiline />
         </View>
       </FormModal>
       <DeleteConfirmModal open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)} itemName="customer" onConfirm={() => deleteId && remove.mutate(deleteId, { onSuccess: () => setDeleteId(null) })} loading={remove.isPending} />

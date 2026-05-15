@@ -17,10 +17,14 @@ const announcement =
 
 import { useAppSelector } from "@/redux/Store";
 import { useMemo } from "react";
+import { useShopSettings } from "@/lib/businessInfo";
 
 const Navbar = () => {
   const location = useLocation();
   const quantities = useAppSelector((state) => state.cart.quantities);
+
+  const { settings } = useShopSettings();
+  const minOrder = settings.minimumOrder ?? 3000;
 
   const totalItems = useMemo(() => {
     return Object.values(quantities).reduce((sum, q) => sum + q, 0);
@@ -95,7 +99,7 @@ const Navbar = () => {
           </div>
 
           <div className="md:hidden absolute left-1/2 -translate-x-1/2 px-3.5 py-1.5 rounded-full border border-primary/35 bg-primary/12 text-[10px] font-black uppercase tracking-[0.14em] text-primary whitespace-nowrap shadow-sm">
-            Minimum Order {"\u20B9"} 3000
+            Minimum Order {"\u20B9"} {minOrder.toLocaleString("en-IN")}
           </div>
 
           <Sheet>

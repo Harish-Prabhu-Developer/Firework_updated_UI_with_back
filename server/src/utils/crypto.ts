@@ -1,5 +1,6 @@
 import CryptoJS from 'crypto-js';
-
+import dotenv from "dotenv";
+dotenv.config();
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY!;
 
 export const encrypt = (text: string): string => {

@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import ScrollReveal from "@/components/ScrollReveal";
 import HeroCarousel from "@/components/HeroCarousel";
 import SEO from "@/components/SEO";
-import { ADDRESS_LINES } from "@/lib/businessInfo";
+import { useShopSettings } from "@/lib/businessInfo";
 import sparklers from "@/assets/sparklers.jpg";
 import flowerPots from "@/assets/flower-pots.jpg";
 import chakkars from "@/assets/chakkars.jpg";
@@ -153,6 +153,8 @@ const indexStructuredData = {
 };
 
 const Index = () => {
+  const { settings } = useShopSettings();
+
   return (
     <div className="bg-background">
       <SEO
@@ -237,12 +239,10 @@ const Index = () => {
                     <MapPin size={24} className="text-primary" />
                   </div>
                   <div>
-                    <p className="font-display font-bold text-lg">{ADDRESS_LINES[0]}</p>
-                    <div className="text-xs text-muted-foreground space-y-0.5">
-                      {ADDRESS_LINES.slice(1).map((line) => (
-                        <p key={line}>{line}</p>
-                      ))}
-                    </div>
+                    <p className="font-display font-bold text-lg">Our Location</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                      {settings.shopAddress}
+                    </p>
                   </div>
                 </div>
               </div>

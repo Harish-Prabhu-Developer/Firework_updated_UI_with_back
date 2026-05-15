@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Router as ExpressRouter } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -12,7 +12,7 @@ import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
 import { paramToString } from '../utils/request.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Ensure upload directories exist
 const dirs = ['uploads/category', 'uploads/products', 'uploads/videos'];

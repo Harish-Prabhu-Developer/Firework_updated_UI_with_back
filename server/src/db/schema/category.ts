@@ -204,6 +204,7 @@ export const videos = pgTable(
     name: varchar("name", { length: 150 }),
     type: videoTypeEnum("type").default("upload").notNull(),
     url: text("url").notNull(),
+    isActive: boolean("status").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

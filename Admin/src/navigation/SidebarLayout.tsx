@@ -6,9 +6,9 @@ import { HeaderBar } from '../components/HeaderBar';
 import * as Screens from '../screens';
 import { BillStack } from './BillStack';
 import { RoleStack } from './RoleStack';
+import { Dimensions } from 'react-native';
 
 const Drawer = createDrawerNavigator();
-
 export const SidebarLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -35,6 +35,7 @@ export const SidebarLayout = () => {
       <Drawer.Screen name="Dashboard" component={Screens.Dashboard} />
       <Drawer.Screen name="Orders" component={Screens.Orders} />
       <Drawer.Screen name="Billing" component={BillStack} />
+      <Drawer.Screen name="Customers" component={Screens.Customers} />
       <Drawer.Screen name="Categories" component={Screens.Categories} />
       <Drawer.Screen name="UOM" component={Screens.UOM} />
       <Drawer.Screen name="Products" component={Screens.Products} />

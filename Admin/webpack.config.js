@@ -82,7 +82,7 @@ module.exports = {
             'react-native-print': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
             'react-native-blob-util': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
             'react-native-fs': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
-            'react-native-camera-kit': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
+            'react-native-camera-kit': path.resolve(__dirname, 'src/shims/react-native-camera-kit.web.js'),
             '@react-native-voice/voice': path.resolve(__dirname, 'src/shims/native-modules.web.js'),
         },
         extensions: ['.web.js', '.js', '.web.ts', '.ts', '.web.tsx', '.tsx', '.json'],

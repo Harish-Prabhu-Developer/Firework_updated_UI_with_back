@@ -5,7 +5,7 @@ import { Input } from "../components/ui/Input";
 import { Textarea } from "../components/ui/Textarea";
 import { Card } from "../components/ui/Card";
 import { ArrowLeft, Plus, Trash2, Save, Mic, ShoppingCart } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { cn } from "../lib/utils";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "../hooks/useToast";
@@ -40,7 +40,7 @@ export const useCreateBillQueries = () => {
     queryKey: ['products-active'],
     queryFn: async () => {
       const { data } = await api.get('/products?limit=999999&isActive=true');
-      return data.data?.data ?? data.data ?? [];
+      return data.data ?? [];
     }
   });
 
@@ -58,6 +58,7 @@ export const useCreateBillQueries = () => {
 
 export default function CreateBill() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { products, isLoading, save } = useCreateBillQueries();
 
   const [customer, setCustomer] = useState({ phone: "", name: "", email: "", address: "" });
@@ -68,10 +69,39 @@ export default function CreateBill() {
   const [tax, setTax] = useState("0");
   const [taxPercent, setTaxPercent] = useState("0");
   const [notes, setNotes] = useState("");
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [showProductSelect, setShowProductSelect] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const insets = useSafeAreaInsets();
   const toast = useToast();
+
+  useEffect(() => {
+    if (route.params?.orderId) {
+      setOrderId(route.params.orderId);
+    }
+    if (route.params?.orderNumber) {
+      setOrderNumber(route.params.orderNumber);
+      setNotes(route.params.notes || `Converted from Order: #${route.params.orderNumber}`);
+    }
+    if (route.params?.customer) {
+      setCustomer({
+        phone: route.params.customer.phone || "",
+        name: route.params.customer.name || "",
+        email: route.params.customer.email || "",
+        address: route.params.customer.address || ""
+      });
+    }
+    if (route.params?.items && Array.isArray(route.params.items)) {
+      setCart(route.params.items.map((item: any) => ({
+        id: item.productId || item.id,
+        productName: item.productName || "Unknown Product",
+        qty: item.quantity || 1,
+        price: parseFloat(item.unitPrice) || 0,
+        total: (item.quantity || 1) * (parseFloat(item.unitPrice) || 0)
+      })));
+    }
+  }, [route.params]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -150,17 +180,18 @@ export default function CreateBill() {
     if (cart.length === 0) { toast.error("Add at least one product"); return; }
 
     const payload = {
-      CustomerData: {
-        phone: customer.phone,
-        name: customer.name,
-        email: customer.email,
-        address: customer.address,
-      },
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      customerEmail: customer.email,
+      customerAddress: customer.address,
       items: cart.map(i => ({ productId: i.id, quantity: i.qty, unitPrice: i.price })),
+      subTotal: subtotal,
       discountAmount: Number(discount),
       taxAmount: Number(tax),
+      totalAmount: finalTotal,
       paymentMethod: paymentMethod.toLowerCase(),
       notes,
+      orderId,
     };
 
     save.mutate(payload, {
@@ -197,6 +228,21 @@ export default function CreateBill() {
               <Text className="text-2xl font-bold text-foreground" style={{ fontFamily: Fonts.display }}>Create Bill</Text>
             </View>
 
+            {orderNumber && (
+              <View className="mb-6 bg-primary/5 border border-primary/20 rounded-2xl p-4 flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+                  <ShoppingCart size={20} color={colors.primary} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[10px] font-black text-primary uppercase tracking-widest mb-0.5">Order Conversion</Text>
+                  <Text className="text-sm font-bold text-foreground">Converting Order #{orderNumber}</Text>
+                </View>
+                <View className="bg-primary px-3 py-1 rounded-full">
+                  <Text className="text-[10px] font-black text-white uppercase">Active</Text>
+                </View>
+              </View>
+            )}
+
             {/* Customer Details */}
             <Card className="mb-6 p-4 md:p-6">
               <Text className="font-semibold text-lg mb-4 text-foreground" style={{ fontFamily: Fonts.display }}>Customer Details</Text>
@@ -206,8 +252,8 @@ export default function CreateBill() {
                     label="Phone Number"
                     required={true}
                     keyboardType="phone-pad"
-                    value={customer.phone}
-                    onChangeText={(v) => setCustomer({ ...customer, phone: formatIdentityDisplay(v) })}
+                    value={formatIdentityDisplay(customer.phone)}
+                    onChangeText={(v) => setCustomer({ ...customer, phone: cleanIdentityInput(v) })}
                     placeholder="Enter phone number"
                   />
                 </View>
@@ -224,7 +270,7 @@ export default function CreateBill() {
                     label="Email"
                     keyboardType="email-address"
                     value={customer.email}
-                    onChangeText={(v) => setCustomer({ ...customer, email: formatIdentityDisplay(v) })}
+                    onChangeText={(v) => setCustomer({ ...customer, email: v })}
                     placeholder="Email address"
                   />
                 </View>

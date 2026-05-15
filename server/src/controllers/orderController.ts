@@ -6,7 +6,7 @@ import { customers } from '../db/schema/invoices.js';
 import { settings } from '../db/schema/settings.js';
 import { eq, inArray, desc, sql, like } from 'drizzle-orm';
 import { generateOrderNumber, formatCurrency } from '../utils/helpers.js';
-import { decrypt } from '../utils/crypto.js';
+import { decrypt, encrypt } from '../utils/crypto.js';
 import { generatePDFFromHTML } from '../services/pdfService.js';
 import { generateOrderHTML } from '../templates/orderTemplate.js';
 import { sendOrderReceivedEmail } from '../services/emailService.js';
@@ -241,13 +241,34 @@ export const getOrderById = async (req: Request, res: Response) => {
     }
 };
 
+export const getOrderToken = async (req: Request, res: Response) => {
+    try {
+        const id = paramToString(req.params.id);
+        if (!id) return res.status(400).json({ success: false, msg: 'Order ID required' });
+
+        const order = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+        if (!order[0]) return res.status(404).json({ success: false, msg: 'Order not found' });
+
+        const token = encrypt(id);
+        console.log('[OrderToken] Generated token for ID:', id, '->', token);
+        res.json({ success: true, data: { token } });
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
 export const getOrderPDF = async (req: Request, res: Response) => {
     try {
-        const encryptedId = paramToString(req.params.encryptedId);
+        const encryptedId = paramToString(req.params[0] || req.params.encryptedId);
+        
         if (!encryptedId) return res.status(400).json({ success: false, msg: 'Encrypted order ID required' });
 
+        console.log('[OrderPDF] Attempting to decrypt token:', encryptedId);
         const orderId = decrypt(encryptedId);
-        if (!orderId) return res.status(400).json({ success: false, msg: 'Invalid order ID' });
+        if (!orderId) {
+            console.error('[OrderPDF] Decryption failed for token:', encryptedId);
+            return res.status(400).json({ success: false, msg: 'Invalid order ID' });
+        }
 
         const order = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
         if (!order[0]) {
@@ -261,7 +282,7 @@ export const getOrderPDF = async (req: Request, res: Response) => {
         const shopInfo = settingRows[0] || {};
 
         const html = generateOrderHTML(
-            { ...order[0], customer: customer[0], items },
+            { ...order[0], customer: customer[0] || { name: 'Guest Customer', phone: 'N/A' }, items },
             '',
             shopInfo,
             shopInfo.orderReceiptQrStatus ?? false
@@ -273,6 +294,7 @@ export const getOrderPDF = async (req: Request, res: Response) => {
         res.setHeader('Content-Disposition', `inline; filename="order_${order[0].orderNumber}.pdf"`);
         res.send(pdf);
     } catch (error: any) {
+        console.error('[OrderPDF] Critical error generating PDF:', error);
         res.status(500).json({ success: false, msg: error.message });
     }
 };

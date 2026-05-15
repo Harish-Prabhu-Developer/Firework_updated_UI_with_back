@@ -2,6 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { API_URL } from '../utils/constants';
+import * as NavigationService from '../navigation/NavigationService';
 
 // ── Typed API Error ─────────────────────────────────────────────────────────
 // Every rejected promise from `api` carries this shape so callers can
@@ -59,11 +60,13 @@ api.interceptors.response.use(
   async (error) => {
     // Network / timeout — no response from server
     if (!error.response) {
-      return Promise.reject({
+      const apiErr: ApiError = {
         success: false,
         msg: 'Server unreachable. Check your connection.',
         errorCode: 'NETWORK_ERROR',
-      } satisfies ApiError);
+      };
+      NavigationService.navigate('NoPermission', { type: 'server' });
+      return Promise.reject(apiErr);
     }
 
     const { status, data } = error.response;
@@ -80,6 +83,16 @@ api.interceptors.response.use(
     // 401 — clear local session so the app re-routes to Login
     if (status === 401) {
       await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+      NavigationService.replace('Login');
+    }
+
+    // 500+ — internal server error
+    if (status >= 500) {
+      NavigationService.navigate('NoPermission', { 
+        type: 'server',
+        title: 'Server Error',
+        message: serverMsg || 'A critical error occurred on our servers. Our team has been notified.'
+      });
     }
 
     const apiError: ApiError = {

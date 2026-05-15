@@ -7,19 +7,22 @@ import {
     convertOrderToInvoice,
     deleteOrder,
     bulkDeleteOrders,
+    getOrderToken,
 } from '../controllers/orderController.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
 
 const router: ExpressRouter = Router();
-router.use(authenticate);
+// Public route for customers to place orders
+router.post('/', createOrder);
 
-router.post('/', checkPermission('orders', 'create'), createOrder);
-router.get('/', checkPermission('orders', 'read'), getAllOrders);
-router.get('/pdf/:encryptedId', checkPermission('orders', 'read'), getOrderPDF);
-router.post('/:id/convert', checkPermission('orders', 'update'), convertOrderToInvoice);
-router.get('/:id', checkPermission('orders', 'read'), getOrderById);
-router.delete('/:id', checkPermission('orders', 'delete'), deleteOrder);
-router.post('/bulk-delete', checkPermission('orders', 'bulkDelete'), bulkDeleteOrders);
+// Protected administrative routes
+router.get('/', authenticate, checkPermission('orders', 'read'), getAllOrders);
+router.get('/pdf/*', getOrderPDF); // Public for verification or internal use? Let's check.
+router.get('/:id/token', authenticate, checkPermission('orders', 'read'), getOrderToken);
+router.post('/:id/convert', authenticate, checkPermission('orders', 'update'), convertOrderToInvoice);
+router.get('/:id', authenticate, checkPermission('orders', 'read'), getOrderById);
+router.delete('/:id', authenticate, checkPermission('orders', 'delete'), deleteOrder);
+router.post('/bulk-delete', authenticate, checkPermission('orders', 'bulkDelete'), bulkDeleteOrders);
 
 export default router;

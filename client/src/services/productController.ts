@@ -10,7 +10,7 @@ export const API_BASE_URL = (
 
 // API Client
 const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: `${API_BASE_URL}/api/v1`,
   headers: {
     "Content-Type": "application/json",
   },
@@ -51,5 +51,21 @@ export const productController = {
       console.error("API Error [getProductsByTags]:", error);
       throw error;
     }
+  }
+};
+
+/**
+ * Fetches the Shop Settings (public — no auth required)
+ */
+export const getShopSettings = async () => {
+  try {
+    const response = await apiClient.get("/settings");
+    if (response.data.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to fetch settings");
+  } catch (error: any) {
+    console.error("API Error [getShopSettings]:", error);
+    throw error;
   }
 };

@@ -309,7 +309,7 @@ const Checkout = () => {
         totalQty,
       };
 
-      const { data } = await axios.post(`${API_BASE_URL}/api/orders`, payload);
+      const { data } = await axios.post(`${API_BASE_URL}/api/v1/orders/`, payload);
 
       if (!data.success) {
         throw new Error(data.message || "Failed to place order.");

@@ -11,10 +11,11 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   Check,
   CloudUpload,
+  Eye,
   FolderTree,
   Link,
   Pencil,
@@ -39,6 +40,7 @@ import { AdaptiveTable } from '../components/AdaptiveTable';
 import { Column } from '../components/table/TableView';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, FontSizes, Fonts } from '../styles/globalStyles';
+import { pickImage } from '../utils/permissionUtils';
 
 const QK = 'categories';
 
@@ -170,39 +172,6 @@ const resolveAssetUri = (uri?: unknown) => {
   return `${API_ORIGIN}${value.startsWith('/') ? value : `/${value}`}`;
 };
 
-const requestImageUploadPermission = async () => {
-  if (Platform.OS !== 'android') return true;
-
-  try {
-    const permission =
-      Number(Platform.Version) >= 33
-        ? (PermissionsAndroid.PERMISSIONS as any).READ_MEDIA_IMAGES
-        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-
-    const granted = await PermissionsAndroid.request(permission, {
-      title: 'Image Upload Permission',
-      message: 'Crackers Kingdom needs access to your images to upload a category photo.',
-      buttonPositive: 'Allow',
-      buttonNegative: 'Deny',
-    });
-
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  } catch {
-    return false;
-  }
-};
-
-const pickImageOnWeb = (): Promise<File | null> =>
-  new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp';
-    input.onchange = (event: any) => {
-      resolve(event.target?.files?.[0] ?? null);
-    };
-    input.oncancel = () => resolve(null);
-    input.click();
-  });
 
 const getUploadedCategoryPath = (response: any) => {
   const uploaded = response?.data?.data ?? response?.data ?? response;
@@ -261,7 +230,7 @@ export const useCategoryQueries = () => {
   const toast = useToast();
 
   const query = useQuery({
-    queryKey: [QK],
+    queryKey: [QK, 'list'],
     queryFn: fetchCategories,
     staleTime: 0,
     refetchOnMount: 'always',
@@ -274,13 +243,13 @@ export const useCategoryQueries = () => {
     },
     onSuccess: (response, variables) => {
       const saved = normalizeCategory(response?.data?.data ?? response?.data, 0);
-      qc.setQueryData<Category[]>([QK], (previous = []) => {
+      qc.setQueryData<Category[]>([QK, 'list'], (previous = []) => {
         const current = toCategoryList(previous);
         const withoutSaved = current.filter(category => category.id !== saved.id);
         const merged = variables.id ? [saved, ...withoutSaved] : [saved, ...current];
         return merged.sort((a, b) => b.rank - a.rank);
       });
-      qc.invalidateQueries({ queryKey: [QK] });
+      qc.invalidateQueries({ queryKey: [QK, 'list'] });
       toast.success(variables.id ? 'Category updated' : 'Category created');
     },
     onError: (e) => toast.apiError(e, 'Operation failed'),
@@ -289,7 +258,7 @@ export const useCategoryQueries = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/categories/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [QK] });
+      qc.invalidateQueries({ queryKey: [QK, 'list'] });
       toast.success('Deleted');
     },
     onError: (e) => toast.apiError(e, 'Delete failed'),
@@ -298,7 +267,7 @@ export const useCategoryQueries = () => {
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: string[]) => api.post('/categories/bulk-delete', { ids }),
     onSuccess: (_, ids) => {
-      qc.invalidateQueries({ queryKey: [QK] });
+      qc.invalidateQueries({ queryKey: [QK, 'list'] });
       toast.success(`${ids.length} deleted`);
     },
     onError: (e) => toast.apiError(e, 'Bulk delete failed'),
@@ -314,6 +283,7 @@ export const useCategoryQueries = () => {
 
 export default function Category() {
   const toast = useToast();
+  const nav = useNavigation<any>();
   const { hasPermission } = usePermissions();
 
   const [search, setSearch] = useState('');
@@ -469,43 +439,18 @@ export default function Category() {
       return;
     }
 
-    const hasDevicePermission = await requestImageUploadPermission();
-    if (!hasDevicePermission) {
-      Alert.alert('Permission Required', 'Image upload permission is required to choose a category photo.');
-      return;
-    }
-
     try {
+      const picked = await pickImage('Category');
+      if (!picked) return;
+
       setImageUploading(true);
-
-      if (Platform.OS === 'web') {
-        const file = await pickImageOnWeb();
-        if (!file) return;
-        await uploadCategoryImage(file);
-        return;
-      }
-
-      const DocumentPicker = require('@react-native-documents/picker');
-      const [picked] = await DocumentPicker.pick({
-        type: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
-      });
-
-      if (!picked?.uri) return;
-
-      await uploadCategoryImage({
+      await uploadCategoryImage(picked.webFile || {
         uri: picked.uri,
-        name: picked.name || `category-${Date.now()}.jpg`,
-        type: picked.type || 'image/jpeg',
+        name: picked.name,
+        type: picked.type,
       });
     } catch (error: any) {
-      const message = error?.msg || error?.message || 'Image upload failed';
-      if (!/cancel/i.test(message)) {
-        if (message.includes('permission')) {
-          toast.warn('You do not have upload permission.');
-        } else {
-          toast.apiError(error, 'Image upload failed');
-        }
-      }
+      toast.apiError(error, 'Image upload failed');
     } finally {
       setImageUploading(false);
     }
@@ -529,6 +474,9 @@ export default function Category() {
     {
       key: 'actions', label: 'Actions', width: 132, align: 'center', render: (c) => (
         <View className="flex-row items-center justify-center" style={{ gap: 16, width: '100%' }}>
+          <TouchableOpacity onPress={() => nav.navigate('Products', { categoryId: c.id })}>
+            <Eye size={19} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={19} color={colors.foreground} /></TouchableOpacity>
           <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={18} color={colors.destructive} /></TouchableOpacity>
         </View>
@@ -569,6 +517,12 @@ export default function Category() {
           <Text style={{ fontWeight: '800' }}>Rank:</Text> {c.rank}
         </Text>
         <View className="flex-row items-center" style={{ gap: 14 }}>
+          <TouchableOpacity
+            onPress={() => nav.navigate('Products', { categoryId: c.id })}
+            style={{ padding: 6, borderRadius: 8 }}
+          >
+            <Eye size={18} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={18} color={colors.foreground} /></TouchableOpacity>
           <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={17} color={colors.destructive} /></TouchableOpacity>
         </View>

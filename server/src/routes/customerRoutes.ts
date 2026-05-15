@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Router as ExpressRouter } from 'express';
 import {
     createCustomer,
     updateCustomer,
@@ -10,7 +10,7 @@ import {
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 router.use(authenticate);
 
 router.post('/', checkPermission('customers', 'create'), createCustomer);

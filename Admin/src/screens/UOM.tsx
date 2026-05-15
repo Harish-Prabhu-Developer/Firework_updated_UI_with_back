@@ -53,16 +53,23 @@ export const useUOMQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const query = useQuery({ queryKey: ['uoms'], queryFn: async () => { const { data } = await api.get('/uoms?limit=999999'); return data.data ?? []; } });
+  const query = useQuery({ 
+    queryKey: ['uoms', 'list'], 
+    queryFn: async () => { 
+      const { data: res } = await api.get('/uoms?limit=999999'); 
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return (list ?? []) as UOM[];
+    } 
+  });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/uoms/${id}`, payload) : api.post('/uoms', payload),
-    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['uoms'] }); toast.success(variables.id ? 'UOM updated' : 'UOM created'); },
+    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['uoms', 'list'] }); toast.success(variables.id ? 'UOM updated' : 'UOM created'); },
     onError: (e) => toast.apiError(e, 'Failed'),
   });
 
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/uoms/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['uoms'] }); toast.success('Deleted'); } });
-  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/uoms/bulk-delete', { ids }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['uoms'] }); toast.success('Deleted'); } });
+  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/uoms/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['uoms', 'list'] }); toast.success('Deleted'); } });
+  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/uoms/bulk-delete', { ids }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['uoms', 'list'] }); toast.success('Deleted'); } });
 
   return { query, save: saveMutation, remove: deleteMutation, bulkRemove: bulkDeleteMutation };
 };

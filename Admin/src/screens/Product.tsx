@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useRoute } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -41,6 +42,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts, FontSizes } from '../styles/globalStyles';
+import { pickImage } from '../utils/permissionUtils';
 
 interface Product {
   id: string; name: string; slug: string; image?: string; images?: string[]; description?: string;
@@ -138,35 +140,6 @@ const UOMBadge = ({ code }: { code?: string }) => (
   </View>
 );
 
-const requestImageUploadPermission = async () => {
-  if (Platform.OS !== 'android') return true;
-  try {
-    const permission = Number(Platform.Version) >= 33
-      ? (PermissionsAndroid.PERMISSIONS as any).READ_MEDIA_IMAGES
-      : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-    const granted = await PermissionsAndroid.request(permission, {
-      title: 'Image Upload Permission',
-      message: 'Crackers Kingdom needs access to your images to upload a product photo.',
-      buttonPositive: 'Allow',
-      buttonNegative: 'Deny',
-    });
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  } catch {
-    return false;
-  }
-};
-
-const pickImageOnWeb = (): Promise<File | null> =>
-  new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp';
-    input.onchange = (event: any) => {
-      resolve(event.target?.files?.[0] ?? null);
-    };
-    input.oncancel = () => resolve(null);
-    input.click();
-  });
 
 const getUploadedProductPath = (response: any) => {
   const uploaded = response?.data?.data ?? response?.data ?? response;
@@ -179,18 +152,32 @@ export const useProductQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const productsQuery = useQuery<Product[]>({ queryKey: ['products'], queryFn: async () => { const { data } = await api.get('/products?limit=999999'); return data.data ?? []; } });
+  const productsQuery = useQuery<Product[]>({ 
+    queryKey: ['products', 'list'], 
+    queryFn: async () => { 
+      const { data: res } = await api.get('/products?limit=999999'); 
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return (list ?? []) as Product[];
+    } 
+  });
   const catsQuery = useQuery<Category[]>({ queryKey: ['categories-list'], queryFn: async () => { const { data } = await api.get('/categories?limit=999999&isActive=true'); return data.data ?? []; } });
-  const uomsQuery = useQuery<UOM[]>({ queryKey: ['uoms-list'], queryFn: async () => { const { data } = await api.get('/uoms?isActive=true'); return data.data ?? []; } });
+  const uomsQuery = useQuery<UOM[]>({ 
+    queryKey: ['uoms', 'list'], 
+    queryFn: async () => { 
+      const { data: res } = await api.get('/uoms?limit=999999'); 
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return (list ?? []) as UOM[];
+    } 
+  });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/products/${id}`, payload) : api.post('/products', payload),
-    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success(variables.id ? 'Product updated' : 'Product created'); },
+    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['products', 'list'] }); toast.success(variables.id ? 'Product updated' : 'Product created'); },
     onError: (e) => toast.apiError(e, 'Failed'),
   });
 
-  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/products/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Deleted'); } });
-  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/products/bulk-delete', { ids }), onSuccess: (_, ids) => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success(`${ids.length} deleted`); } });
+  const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/products/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ['products', 'list'] }); toast.success('Deleted'); } });
+  const bulkDeleteMutation = useMutation({ mutationFn: (ids: string[]) => api.post('/products/bulk-delete', { ids }), onSuccess: (_, ids) => { qc.invalidateQueries({ queryKey: ['products', 'list'] }); toast.success(`${ids.length} deleted`); } });
 
   return {
     query: productsQuery,
@@ -217,6 +204,14 @@ export default function Product() {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
   const [imageUploading, setImageUploading] = useState(false);
+
+  const route = useRoute<any>();
+
+  useEffect(() => {
+    if (route.params?.categoryId) {
+      setFilterCat(route.params.categoryId);
+    }
+  }, [route.params?.categoryId]);
 
   const data = useMemo(() => {
     let d = all as Product[];
@@ -290,38 +285,18 @@ export default function Product() {
       return;
     }
 
-    const hasDevicePermission = await requestImageUploadPermission();
-    if (!hasDevicePermission) {
-      Alert.alert('Permission Required', 'Image upload permission is required to choose a product photo.');
-      return;
-    }
-
     try {
+      const picked = await pickImage('Product');
+      if (!picked) return;
+
       setImageUploading(true);
-      if (Platform.OS === 'web') {
-        const file = await pickImageOnWeb();
-        if (!file) return;
-        await uploadProductImage(file);
-        return;
-      }
-
-      const DocumentPicker = require('@react-native-documents/picker');
-      const [picked] = await DocumentPicker.pick({
-        type: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'],
-      });
-
-      if (!picked?.uri) return;
-
-      await uploadProductImage({
+      await uploadProductImage(picked.webFile || {
         uri: picked.uri,
-        name: picked.name || `product-${Date.now()}.jpg`,
-        type: picked.type || 'image/jpeg',
+        name: picked.name,
+        type: picked.type,
       });
     } catch (error: any) {
-      const message = error?.msg || error?.message || 'Image upload failed';
-      if (!/cancel/i.test(message)) {
-        toast.apiError(error, 'Image upload failed');
-      }
+      toast.apiError(error, 'Image upload failed');
     } finally {
       setImageUploading(false);
     }

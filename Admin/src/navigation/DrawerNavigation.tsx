@@ -28,6 +28,7 @@ export const DrawerNavigation = () => {
       <Drawer.Screen name="Dashboard" component={Screens.Dashboard} />
       <Drawer.Screen name="Orders" component={Screens.Orders} />
       <Drawer.Screen name="Billing" component={BillStack} />
+      <Drawer.Screen name="Customers" component={Screens.Customers} />
       <Drawer.Screen name="Categories" component={Screens.Categories} />
       <Drawer.Screen name="UOM" component={Screens.UOM} />
       <Drawer.Screen name="Products" component={Screens.Products} />

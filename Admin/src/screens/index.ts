@@ -20,6 +20,4 @@ export { default as Media } from './Media';
 export { default as QrScan } from './QrScan';
 export { NoPermission } from './NoPermission';
 export { default as Permissions } from './RolePermissions';
-
-// Re-export provided screens (these are already in the src/screens folder)
-// Login is handled separately in App.tsx
+export { default as PdfViewer } from './PdfViewerScreen';

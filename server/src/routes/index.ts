@@ -13,6 +13,8 @@ import roleRoutes from './roleRoutes.js';
 import settingRoutes from './settingRoutes.js';
 import uploadRoutes from './uploadRoutes.js';
 import bannerRoutes from './bannerRoutes.js';
+import clientProductRoutes from './client.productRoutes.js';
+import analyticsRoutes from './analyticsRoutes.js';
 // import mediaRoutes from './mediaRoutes.js';
 
 const router: ExpressRouter = Router();
@@ -31,6 +33,8 @@ router.use('/roles', roleRoutes);
 router.use('/settings', settingRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/banners', bannerRoutes);
+router.use('/client', clientProductRoutes);
+router.use('/analytics', analyticsRoutes);
 // router.use('/media', mediaRoutes);
 
 export default router;
