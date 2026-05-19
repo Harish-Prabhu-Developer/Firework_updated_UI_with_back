@@ -57,6 +57,8 @@ interface AssetItem {
   type: 'image' | 'video';
   size: number;
   createdAt: string;
+  assetType: 'category' | 'products' | 'videos';
+  linkedCount: number;
 }
 
 interface HeroFormState {
@@ -110,40 +112,7 @@ const INITIAL_HEROES: HeroSlide[] = [
   },
 ];
 
-const INITIAL_ASSETS: AssetItem[] = [
-  {
-    id: 'asset-1',
-    name: 'crackers-banner.jpg',
-    url: 'https://picsum.photos/id/40/1200/900',
-    type: 'image',
-    size: 245000,
-    createdAt: '2026-04-15',
-  },
-  {
-    id: 'asset-2',
-    name: 'sparklers-thumb.png',
-    url: 'https://picsum.photos/id/41/1200/900',
-    type: 'image',
-    size: 182000,
-    createdAt: '2026-04-18',
-  },
-  {
-    id: 'asset-3',
-    name: 'festival-promo.mp4',
-    url: 'https://www.w3schools.com/html/mov_bbb.mp4',
-    type: 'video',
-    size: 5200000,
-    createdAt: '2026-04-20',
-  },
-  {
-    id: 'asset-4',
-    name: 'night-display-cover.jpg',
-    url: 'https://picsum.photos/id/42/1200/900',
-    type: 'image',
-    size: 301000,
-    createdAt: '2026-04-24',
-  },
-];
+
 
 const createDefaultHeroForm = (displayOrder: number): HeroFormState => ({
   title: '',
@@ -205,21 +174,23 @@ export const useMediaQueries = () => {
     queryKey: ['assets'],
     queryFn: async () => {
       try {
-        const { data } = await api.get('/uploads');
+        const { data } = await api.get('/media');
         const raw = data.data ?? [];
         return raw.map((item: any) => ({
           id: item.fileName,
           name: item.fileName,
           url: item.relativePath.startsWith('http') ? item.relativePath : `${api.defaults.baseURL?.replace('/api/v1', '')}${item.relativePath}`,
-          type: item.assetType === 'videoFile' ? 'video' : 'image',
+          type: (item.assetType === 'videos' || item.fileName.endsWith('.mp4')) ? 'video' : 'image',
           size: item.size,
           createdAt: new Date(item.updatedAt).toLocaleDateString(),
+          assetType: item.assetType,
+          linkedCount: item.linkedCount || 0,
         }));
       } catch {
-        return INITIAL_ASSETS;
+        return [];
       }
     },
-    initialData: INITIAL_ASSETS,
+    initialData: [],
   });
 
   const saveHeroMutation = useMutation({
@@ -241,6 +212,36 @@ export const useMediaQueries = () => {
     onError: (e) => toast.apiError(e, 'Failed'),
   });
 
+  const uploadAssetMutation = useMutation({
+    mutationFn: async ({ type, file }: { type: 'category' | 'products' | 'videos'; file: any }) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      const response = await api.post(`/media/upload/${type}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assets'] });
+      toast.success('Asset uploaded successfully');
+    },
+    onError: (e) => toast.apiError(e, 'Failed to upload asset'),
+  });
+
+  const deleteAssetMutation = useMutation({
+    mutationFn: async ({ type, fileName }: { type: 'category' | 'products' | 'videos'; fileName: string }) => {
+      const response = await api.delete(`/media/delete/${type}/${fileName}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['assets'] });
+      toast.success('Asset deleted successfully');
+    },
+    onError: (e) => toast.apiError(e, 'Failed to delete asset'),
+  });
+
   return {
     heroes: heroesQuery.data || [],
     assets: assetsQuery.data || [],
@@ -252,6 +253,8 @@ export const useMediaQueries = () => {
       onSuccess: () => { qc.invalidateQueries({ queryKey: ['heroes'] }); toast.success('Selected slides deleted'); },
       onError: (e) => toast.apiError(e, 'Failed'),
     }),
+    uploadAsset: uploadAssetMutation,
+    deleteAsset: deleteAssetMutation,
   };
 };
 
@@ -260,15 +263,16 @@ export default function Media() {
   const { hasPermission } = usePermissions();
   const toast = useToast();
 
-  const { heroes, assets, isLoading, saveHero, removeHero, bulkRemoveHero } = useMediaQueries();
+  const { heroes, assets, isLoading, saveHero, removeHero, bulkRemoveHero, uploadAsset, deleteAsset } = useMediaQueries();
 
   const canCreate = hasPermission(MODULE, 'Create');
   const canUpdate = hasPermission(MODULE, 'Update');
   const canDelete = hasPermission(MODULE, 'Delete');
 
-  const [activeMode, setActiveMode] = useState<ViewMode>('Hero');
+  const [activeMode, setActiveMode] = useState<ViewMode>('Assets');
   const [heroSearch, setHeroSearch] = useState('');
   const [assetSearch, setAssetSearch] = useState('');
+  const [selectedFolder, setSelectedFolder] = useState<'all' | 'category' | 'products' | 'videos'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [heroFormOpen, setHeroFormOpen] = useState(false);
   const [deleteHeroId, setDeleteHeroId] = useState<string | null>(null);
@@ -288,10 +292,30 @@ export default function Media() {
   }, [heroSearch, heroes]);
 
   const filteredAssets = useMemo(() => {
+    let result = assets;
+    if (selectedFolder !== 'all') {
+      result = assets.filter((asset) => asset.assetType === selectedFolder);
+    }
     const query = assetSearch.trim().toLowerCase();
-    if (!query) return assets;
-    return assets.filter((asset) => asset.name.toLowerCase().includes(query));
-  }, [assetSearch, assets]);
+    if (!query) return result;
+    return result.filter((asset) => asset.name.toLowerCase().includes(query));
+  }, [assetSearch, assets, selectedFolder]);
+
+  const totalLibrarySize = useMemo(() => {
+    return assets.reduce((sum, asset) => sum + (asset.size || 0), 0);
+  }, [assets]);
+
+  const filteredFolderSize = useMemo(() => {
+    return filteredAssets.reduce((sum, asset) => sum + (asset.size || 0), 0);
+  }, [filteredAssets]);
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   const activeHero = heroes.find((hero) => hero.status) ?? heroes[0];
 
@@ -430,15 +454,6 @@ export default function Media() {
       extraHeaderContent={
         <View className="flex-row bg-muted p-1 rounded-2xl border border-border/60">
           <TouchableOpacity
-            className={`px-4 py-2 rounded-xl flex-row items-center gap-2 ${activeMode === 'Hero' ? 'bg-card shadow-sm shadow-primary/20' : ''}`}
-            onPress={() => setActiveMode('Hero')}
-          >
-            <Monitor size={14} color={activeMode === 'Hero' ? colors.primary : colors.mutedForeground} />
-            <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${activeMode === 'Hero' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Banners
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             className={`px-4 py-2 rounded-xl flex-row items-center gap-2 ${activeMode === 'Assets' ? 'bg-card shadow-sm shadow-primary/20' : ''}`}
             onPress={() => setActiveMode('Assets')}
           >
@@ -447,12 +462,21 @@ export default function Media() {
               Assets
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            className={`px-4 py-2 rounded-xl flex-row items-center gap-2 ${activeMode === 'Hero' ? 'bg-card shadow-sm shadow-primary/20' : ''}`}
+            onPress={() => setActiveMode('Hero')}
+          >
+            <Monitor size={14} color={activeMode === 'Hero' ? colors.primary : colors.mutedForeground} />
+            <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${activeMode === 'Hero' ? 'text-primary' : 'text-muted-foreground'}`}>
+              Banners
+            </Text>
+          </TouchableOpacity>
         </View>
       }
     >
       {activeMode === 'Hero' ? (
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => {
               if (activeHero) {
@@ -563,22 +587,59 @@ export default function Media() {
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
-          <View className="flex-row items-center gap-3 mb-5">
-            <View className="flex-1">
-              <Input
-                value={assetSearch}
-                onChangeText={setAssetSearch}
-                placeholder="Search media files"
-              />
+          <View className="mb-5">
+            <View className="flex-row items-center gap-3 mb-4">
+              <View className="flex-1">
+                <Input
+                  value={assetSearch}
+                  onChangeText={setAssetSearch}
+                  placeholder="Search media files"
+                />
+              </View>
+              <Button
+                size="md"
+                className="px-4"
+                onPress={() => {
+                  const targetFolder = selectedFolder === 'all' ? 'products' : selectedFolder;
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = targetFolder === 'videos' ? 'video/mp4' : 'image/*';
+                  input.onchange = (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      uploadAsset.mutate({ type: targetFolder, file });
+                    }
+                  };
+                  input.click();
+                }}
+                loading={uploadAsset.isPending}
+                disabled={!canCreate}
+              >
+                <Upload size={14} color={colors.primaryForeground} />
+                <Text style={{ fontFamily: Fonts.body }} className="text-white font-bold text-xs uppercase ml-1">Upload</Text>
+              </Button>
             </View>
-            <Button
-              size="md"
-              className="px-4"
-              onPress={() => toast.info('Upload flow is ready to be wired to your storage API')}
-            >
-              <Upload size={14} color={colors.primaryForeground} />
-              <Text style={{ fontFamily: Fonts.body }} className="text-white font-bold text-xs uppercase ml-1">Upload</Text>
-            </Button>
+
+            <View className="flex-row items-center justify-between flex-wrap gap-3">
+              <View className="flex-row gap-2 flex-wrap">
+                {(['all', 'category', 'products', 'videos'] as const).map((folder) => (
+                  <TouchableOpacity
+                    key={folder}
+                    className={`px-4 py-2 rounded-xl border ${selectedFolder === folder ? 'bg-primary/10 border-primary' : 'bg-muted border-border/60'}`}
+                    onPress={() => setSelectedFolder(folder)}
+                  >
+                    <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${selectedFolder === folder ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {folder}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/20 flex-row items-center gap-2">
+                <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-primary uppercase">
+                  {selectedFolder === 'all' ? 'Total Library Size' : `${selectedFolder} Folder Size`}: {formatSize(selectedFolder === 'all' ? totalLibrarySize : filteredFolderSize)}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <FlatList
@@ -594,9 +655,9 @@ export default function Media() {
               </View>
             }
             renderItem={({ item }) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
-                style={{ width: isMobile ? '50%' : '25%' }} 
+                style={{ width: isMobile ? '50%' : '25%' }}
                 className="p-2"
                 onPress={() => {
                   setPreviewUri(item.url);
@@ -621,12 +682,33 @@ export default function Media() {
                     </Text>
                     <Text style={{ fontFamily: Fonts.body }} className="text-[10px] text-muted-foreground mb-3">
                       {(item.size / 1024).toFixed(0)} KB • {item.createdAt}
+                      {`\nFolder: ${item.assetType} • Linked: ${item.linkedCount}`}
                     </Text>
                     <View className="flex-row items-center justify-between">
-                      <StatusBadge status={item.type === 'image' ? 'Active' : 'pending'} />
-                      <TouchableOpacity onPress={() => toast.info(`Asset URL: ${item.url}`)}>
-                        <Copy size={14} color={colors.primary} />
-                      </TouchableOpacity>
+                      <StatusBadge status={item.linkedCount > 0 ? 'Active' : 'Inactive'} />
+                      <View className="flex-row gap-2">
+                        <TouchableOpacity onPress={(e) => {
+                          e.stopPropagation();
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(item.url);
+                            toast.success('Asset URL copied!');
+                          } else {
+                            toast.info(`Asset URL: ${item.url}`);
+                          }
+                        }}>
+                          <Copy size={14} color={colors.primary} />
+                        </TouchableOpacity>
+                        {canDelete && (
+                          <TouchableOpacity onPress={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Are you sure you want to delete this asset?`)) {
+                              deleteAsset.mutate({ type: item.assetType, fileName: item.name });
+                            }
+                          }}>
+                            <Trash2 size={14} color={colors.destructive} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
                   </View>
                 </Card>

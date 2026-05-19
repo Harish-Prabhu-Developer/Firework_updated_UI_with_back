@@ -24,5 +24,5 @@ export const settings = pgTable("settings", {
   salesStatus: boolean("sales_status").notNull().default(true),
   orderReceiptQrStatus: boolean("order_receipt_qr_status").notNull().default(true),
   invoiceQrStatus: boolean("invoice_qr_status").notNull().default(true),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 });

@@ -190,30 +190,41 @@ export const getAllOrders = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, msg: 'Invalid order status' });
         }
 
-        const allOrders = status
-            ? await db.select().from(orders).where(eq(orders.status, status as typeof orderStatusEnum.enumValues[number])).orderBy(desc(orders.createdAt))
-            : await db.select().from(orders).orderBy(desc(orders.createdAt));
-        const paginated = allOrders.slice(offset, offset + limitNum);
+        const whereCondition = status 
+            ? eq(orders.status, status as typeof orderStatusEnum.enumValues[number])
+            : undefined;
 
-        const ordersWithCustomer = await Promise.all(
-            paginated.map(async (order) => {
-                const customer = await db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1);
-                const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-                return { ...order, customer: customer[0], items };
-            })
-        );
+        // Fetch paginated data efficiently with joins
+        const paginatedOrders = await db.query.orders.findMany({
+            where: whereCondition,
+            orderBy: [desc(orders.createdAt)],
+            limit: limitNum,
+            offset: offset,
+            with: {
+                customer: true,
+                items: true,
+            }
+        });
+
+        // Get total count (efficiently without fetching all rows)
+        const totalResult = await db.select({ count: sql<number>`count(*)` })
+            .from(orders)
+            .where(whereCondition);
+            
+        const totalCount = Number(totalResult[0]?.count || 0);
 
         res.json({
             success: true,
-            data: ordersWithCustomer,
+            data: paginatedOrders,
             pagination: {
                 page: pageNum,
                 limit: limitNum,
-                total: allOrders.length,
-                totalPages: Math.ceil(allOrders.length / limitNum),
+                total: totalCount,
+                totalPages: Math.ceil(totalCount / limitNum) || 1,
             },
         });
     } catch (error: any) {
+        console.error("GetAllOrders Error:", error);
         res.status(500).json({ success: false, msg: error.message });
     }
 };
@@ -281,11 +292,23 @@ export const getOrderPDF = async (req: Request, res: Response) => {
         const settingRows = await db.select().from(settings).limit(1);
         const shopInfo = settingRows[0] || {};
 
+        const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
+        const verificationUrl = `${baseUrl}/api/v1/orders/pdf/${encryptedId}`;
+        const isQrEnabled = !!shopInfo.orderReceiptQrStatus;
+
+        const qrCodeDataUrl = isQrEnabled
+            ? await QRCode.toDataURL(verificationUrl, {
+                margin: 1,
+                width: 200,
+                color: { dark: '#1f2937', light: '#ffffff' }
+            })
+            : '';
+
         const html = generateOrderHTML(
             { ...order[0], customer: customer[0] || { name: 'Guest Customer', phone: 'N/A' }, items },
-            '',
+            qrCodeDataUrl,
             shopInfo,
-            shopInfo.orderReceiptQrStatus ?? false
+            false
         );
 
         const pdf = await generatePDFFromHTML(html, `order_${order[0].orderNumber}`);

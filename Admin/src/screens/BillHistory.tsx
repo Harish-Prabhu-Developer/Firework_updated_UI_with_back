@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { PdfViewer } from '../components/common/PdfViewer';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Trash2, Eye, Download } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
 import { AdaptiveTable } from '../components/AdaptiveTable';
-import { Pagination } from '../components/common/Pagination';
 import { FormModal } from '../components/modals/FormModal';
 import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -33,22 +32,16 @@ interface Invoice {
 }
 
 // Slice-like hook for Bill operations
-export const useBillQueries = (page = 1, limit = 50, search = '', paymentMethod = '') => {
+export const useBillQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
   const query = useQuery({
-    queryKey: ['invoices', page, limit, search, paymentMethod],
+    queryKey: ['invoices'],
     queryFn: async () => {
-      let url = `/invoices?page=${page}&limit=${limit}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
-      if (paymentMethod) url += `&paymentMethod=${encodeURIComponent(paymentMethod)}`;
-
-      const { data } = await api.get(url);
-      return {
-        items: (data.data ?? []) as Invoice[],
-        pagination: data.pagination ?? { page, limit, total: 0, totalPages: 1 },
-      };
+      const { data } = await api.get('/invoices?limit=999999');
+      const list = [data, data?.data, data?.data?.data].find(Array.isArray);
+      return (list ?? []) as Invoice[];
     },
   });
 
@@ -75,19 +68,31 @@ export default function BillHistory() {
   const toast = useToast();
   const navigation = useNavigation<any>();
 
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
 
-  const { query, remove, bulkRemove } = useBillQueries(page, limit, search, filterPayment);
-  const data = query.data?.items || [];
-  const pagination = query.data?.pagination;
+  const { query, remove, bulkRemove } = useBillQueries();
+  const all = query.data || [];
   const isLoading = query.isLoading;
 
   const [selectedIds, setSelectedIds] = useState(new Set<string>());
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null); const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  const data = useMemo(() => {
+    let d = all as Invoice[];
+    if (search) {
+      d = d.filter(i => 
+        i.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
+        i.customer?.name?.toLowerCase().includes(search.toLowerCase()) || 
+        i.customer?.phone?.includes(search)
+      );
+    }
+    if (filterPayment) {
+      d = d.filter(i => i.paymentMethod === filterPayment);
+    }
+    return d;
+  }, [all, search, filterPayment]);
 
   const handleViewPDF = async (invoice: Invoice) => {
     try {
@@ -221,31 +226,18 @@ export default function BillHistory() {
       subtitle="All generated invoices"
       onAddNew={() => navigation.navigate('CreateBill')}
       addNewLabel="Create Bill"
+      bottomContentInset={96}
     >
       <AdaptiveTable data={data} columns={columns} loading={isLoading} emptyText="No invoices found"
-        searchValue={search} onSearchChange={(v) => { setSearch(v); setPage(1); }}
+        searchValue={search} onSearchChange={setSearch}
         filters={[{ key: 'payment', label: 'Payment', options: [{ label: 'Cash', value: 'cash' }, { label: 'UPI', value: 'upi' }, { label: 'Card', value: 'card' }] }]}
-        filterValues={{ payment: filterPayment }} onFilterChange={(_, v) => { setFilterPayment(v); setPage(1); }}
+        filterValues={{ payment: filterPayment }} onFilterChange={(_, v) => setFilterPayment(v)}
         selectedIds={selectedIds} onSelectAll={(a) => setSelectedIds(a ? new Set(data.map(d => d.id)) : new Set())}
         onSelectRow={toggleSelect} onBulkDelete={selectedIds.size > 0 ? () => setBulkDeleteOpen(true) : undefined}
         exportTitle="Invoices Report" exportFilename="invoices"
         exportColumns={[{ key: 'invoiceNumber', label: 'Invoice #' }, { key: 'paymentMethod', label: 'Payment' }, { key: 'totalAmount', label: 'Total' }, { key: 'createdAt', label: 'Date' }]}
         renderCard={renderCard}
-        showPagination={false}
-        externalPerPage={limit}
-        onExternalPerPageChange={(n) => { setLimit(n); setPage(1); }}
       />
-
-      {/* Pagination */}
-      {pagination && (
-        <Pagination
-          page={pagination.page}
-          totalPages={pagination.totalPages}
-          total={pagination.total}
-          perPage={pagination.limit}
-          onPageChange={setPage}
-        />
-      )}
 
       {/* Invoice Detail */}
       <FormModal open={!!detailInvoice} onClose={() => setDetailInvoice(null)} title={`Invoice: ${detailInvoice?.invoiceNumber}`} subtitle={`Customer: ${detailInvoice?.customer?.name}`}>

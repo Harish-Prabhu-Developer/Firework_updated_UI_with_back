@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, Image, StatusBar } from 'react-native';
 import { Menu, Bell, User } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { Fonts, Radius } from '../styles/globalStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { UserProfileModal } from './modals/UserProfileModal';
 
 interface HeaderBarProps {
   title: string;
@@ -13,6 +15,20 @@ interface HeaderBarProps {
 
 export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => {
   const insets = useSafeAreaInsets();
+  const [userName, setUserName] = useState('Admin User');
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('user').then(raw => {
+      if (raw) {
+        try {
+          const u = JSON.parse(raw);
+          if (u.name) setUserName(u.name);
+        } catch {}
+      }
+    });
+  }, []);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
 
@@ -29,13 +45,29 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
           <View style={styles.badge} />
         </Pressable>
 
-        <View style={styles.userProfile}>
-          {isDesktop && <Text style={styles.userName}>Admin User</Text>}
+        <Pressable style={styles.userProfile} onPress={() => setProfileOpen(true)}>
+          {isDesktop && <Text style={styles.userName}>{userName}</Text>}
           <View style={styles.avatar}>
             <User size={18} color="white" />
           </View>
-        </View>
+        </Pressable>
       </View>
+
+      <UserProfileModal 
+        open={profileOpen} 
+        onClose={() => {
+          setProfileOpen(false);
+          // Refresh user name on close in case it was edited
+          AsyncStorage.getItem('user').then(raw => {
+            if (raw) {
+              try {
+                const u = JSON.parse(raw);
+                if (u.name) setUserName(u.name);
+              } catch {}
+            }
+          });
+        }} 
+      />
     </View>
   );
 };

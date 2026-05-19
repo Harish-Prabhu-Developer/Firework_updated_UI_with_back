@@ -361,13 +361,12 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
                         </div>
                     </div>
                     <div class="brand-section">
-                        <h1>${shopInfo.shopName || SHOP_DETAILS.shopName}</h1>
+                        <h1 style="text-transform: uppercase;">${shopInfo.shopName || SHOP_DETAILS.shopName}</h1>
                         <p class="brand-legal">${SHOP_DETAILS.legalName}</p>
-                        <p class="brand-line">${shopInfo.shopAddress || SHOP_DETAILS.addressLine1}</p>
-                        <p class="brand-contact">Ph: ${shopInfo.shopPhone || SHOP_DETAILS.contactLine}</p>
-                        ${shopInfo.whatsappNum ? `<p class="brand-contact">WhatsApp: ${shopInfo.whatsappNum}</p>` : ''}
+                        <p class="brand-line" style="max-width: 320px; line-height: 1.5; margin-bottom: 6px;">${shopInfo.shopAddress || SHOP_DETAILS.addressLine1}</p>
+                        <p class="brand-contact">Phone: ${shopInfo.shopPhone || SHOP_DETAILS.contactLine}</p>
                         ${shopInfo.shopEmail ? `<p class="brand-line">Email: ${shopInfo.shopEmail}</p>` : ''}
-                        <p class="brand-gstin">${shopInfo.shopGst ? `GSTIN: ${shopInfo.shopGst}` : SHOP_DETAILS.gstinLine}</p>
+                        <p class="brand-gstin" style="margin-top: 6px;">${shopInfo.shopGst ? `GSTIN: ${shopInfo.shopGst}` : SHOP_DETAILS.gstinLine}</p>
                     </div>
                 </div>
                 <div class="header-right">

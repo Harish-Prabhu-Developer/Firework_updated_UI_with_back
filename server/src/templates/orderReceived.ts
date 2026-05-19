@@ -1,3 +1,14 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const logoPath = path.resolve(__dirname, '../assets/logo.png');
+const logoBase64 = fs.existsSync(logoPath) ? fs.readFileSync(logoPath, 'base64') : '';
+const logoDataUri = logoBase64 ? `data:image/png;base64,${logoBase64}` : '';
+
 interface OrderItem {
   productName: string;
   content?: string;
@@ -63,7 +74,7 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 <tr>
 <td align="center" style="background:#D4A017;padding:30px">
   <div style="background:#000000;padding:12px 20px;border-radius:8px;display:inline-block">
-    <img src="https://crackerskingdom-demo2.netlify.app/assets/logo-DfoKolw9.png" width="140" alt="Crackers Kingdom Logo" style="display:block">
+    <img src="${logoDataUri}" width="140" alt="Crackers Kingdom Logo" style="display:block">
   </div>
   <h1 class="heading" style="color:#ffffff;margin-top:14px;font-size:26px;font-weight:700;font-family:Arial,Helvetica,sans-serif">
     Crackers Kingdom
@@ -96,7 +107,7 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
   <table width="100%" style="background:#F7F4EF;border-radius:14px">
     <tr>
       <td width="40%" style="padding:10px" align="center">
-        <div style="width:180px;height:180px;border-radius:999px;padding:3px;background:linear-gradient(135deg,#D4A017,#E7C561,#D4A017);box-shadow:0 0 0 4px rgba(212,160,23,0.18),0 0 26px rgba(212,160,23,0.55);display:inline-block"><div style="width:100%;height:100%;border-radius:999px;background:#111111;border:1px solid rgba(255,255,255,0.2);overflow:hidden"><img src="https://crackerskingdom-demo2.netlify.app/assets/logo-DfoKolw9.png" width="100%" alt="Crackers Kingdom Logo" style="display:block;width:100%;height:100%;object-fit:contain;padding:8px;border-radius:999px"></div></div>
+        <div style="width:180px;height:180px;border-radius:999px;padding:3px;background:linear-gradient(135deg,#D4A017,#E7C561,#D4A017);box-shadow:0 0 0 4px rgba(212,160,23,0.18),0 0 26px rgba(212,160,23,0.55);display:inline-block"><div style="width:100%;height:100%;border-radius:999px;background:#111111;border:1px solid rgba(255,255,255,0.2);overflow:hidden"><img src="${logoDataUri}" width="100%" alt="Crackers Kingdom Logo" style="display:block;width:100%;height:100%;object-fit:contain;padding:8px;border-radius:999px"></div></div>
       </td>
       <td width="60%" style="padding:20px">
         <h3 class="heading primary" style="margin:0 0 8px 0">Enquiry Received</h3>

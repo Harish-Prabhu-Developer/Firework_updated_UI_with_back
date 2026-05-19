@@ -32,7 +32,7 @@ export const banners = pgTable(
     status: boolean("status").default(true).notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     orderIdx: index("hero_slides_display_order_idx").on(table.displayOrder),
@@ -52,7 +52,7 @@ export const uoms = pgTable(
     description: text("description"),
     isActive: boolean("status").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     codeUnique: unique().on(table.code),
@@ -75,7 +75,7 @@ export const categories = pgTable(
     rank: integer("display_order").default(0).notNull(),
     isActive: boolean("status").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     slugIdx: index("category_slug_idx").on(table.slug),
@@ -112,7 +112,7 @@ export const products = pgTable(
     isActive: boolean("status").default(true).notNull(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     categorySlugUnique: unique().on(table.categoryId, table.slug),
@@ -135,7 +135,7 @@ export const productStocks = pgTable(
       .references(() => products.id, { onDelete: "cascade", onUpdate: "cascade" }),
     quantity: integer("quantity").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     oneStockPerProduct: unique().on(table.productId),
@@ -160,7 +160,7 @@ export const tags = pgTable(
 
     isActive: boolean("status").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     nameUnique: unique().on(table.name),
@@ -206,7 +206,7 @@ export const videos = pgTable(
     url: text("url").notNull(),
     isActive: boolean("status").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     productIdx: index("videos_product_id_idx").on(table.productId),

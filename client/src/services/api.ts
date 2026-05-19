@@ -1,11 +1,10 @@
 import axios from "axios";
 
 // API Base URL
-const DEFAULT_DEV_API_BASE_URL = "http://localhost:3000";
-
+// In development, requests are proxied by Vite (vite.config.ts → server.proxy),
+// so we use a relative base URL (""). In production, VITE_API_BASE_URL must be set.
 export const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? DEFAULT_DEV_API_BASE_URL : "")
+  import.meta.env.VITE_API_BASE_URL ?? ""
 ).replace(/\/$/, "");
 
 // API Clients
@@ -23,6 +22,11 @@ export const productService = {
     return response.data.data;
   },
   
+  getFeaturedProducts: async () => {
+    const response = await apiClient.get("/client/products/featured");
+    return response.data.data;
+  },
+  
   // Example for future: getProductsByTags
   getProductsByTags: async () => {
     const response = await apiClient.get("/client/products-by-tags");
@@ -34,6 +38,14 @@ export const productService = {
 export const settingsService = {
   getSettings: async () => {
     const response = await apiClient.get("/settings");
+    return response.data;
+  }
+};
+
+// Contact Service
+export const contactService = {
+  submitMessage: async (data: { name: string; phone?: string; subject?: string; message: string }) => {
+    const response = await apiClient.post("/contact", data);
     return response.data;
   }
 };

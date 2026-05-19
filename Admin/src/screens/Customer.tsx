@@ -61,14 +61,48 @@ export default function Customer() {
   const openEdit = (c: Customer) => { setEditItem(c); setForm({ name: c.name, phone: c.phone, email: c.email ?? '', address: c.address ?? '' }); setFormOpen(true); };
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
+  const wrapTextStyle = {
+    flexShrink: 1,
+    flexWrap: 'wrap' as const,
+    minWidth: 0,
+    maxWidth: '100%' as const,
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
+  } as any;
+
   const columns: Column<Customer>[] = [
-    { key: 'name', label: 'Name', width: 180, sortable: true, render: (c) => <View className="flex-row items-center gap-2"><View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center"><Text className="text-xs font-black text-primary" style={{ fontFamily: Fonts.body }}>{c.name[0]?.toUpperCase()}</Text></View><Text className="font-bold text-sm" style={{ fontFamily: Fonts.body }}>{c.name}</Text></View> },
-    { key: 'phone', label: 'Phone', width: 140, render: (c) => <Text className="text-sm font-mono">{formatIdentityDisplay(c.phone)}</Text> },
+    { key: 'name', label: 'Name', width: 180, sortable: true, render: (c) => <View className="flex-row items-center gap-2" style={{ minWidth: 0, maxWidth: '100%' }}><View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center" style={{ flexShrink: 0 }}><Text className="text-xs font-black text-primary" style={{ fontFamily: Fonts.body }}>{c.name[0]?.toUpperCase()}</Text></View><Text className="font-bold text-sm" style={[{ fontFamily: Fonts.body }, wrapTextStyle]}>{c.name}</Text></View> },
+    { key: 'phone', label: 'Phone', width: 140, render: (c) => <Text className="text-sm font-mono" style={wrapTextStyle}>{formatIdentityDisplay(c.phone)}</Text> },
     { key: 'email', label: 'Email', width: 200, render: (c) => <Text className="text-sm text-muted-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{c.email || '—'}</Text> },
     { key: 'address', label: 'Address', width: 200, render: (c) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={2}>{c.address || '—'}</Text> },
     { key: 'createdAt', label: 'Joined Date', width: 120, render: (c) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{new Date(c.createdAt).toLocaleDateString('en-IN')}</Text> },
     { key: 'actions', label: 'Actions', width: 90, render: (c) => <View className="flex-row gap-1"><TouchableOpacity onPress={() => openEdit(c)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(c.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
   ];
+  const wrappedColumns: Column<Customer>[] = columns.map((col) => {
+    if (col.key === 'email') {
+      return {
+        ...col,
+        render: (c) => (
+          <Text className="text-sm text-muted-foreground" style={[{ fontFamily: Fonts.body }, wrapTextStyle]}>
+            {c.email || 'â€”'}
+          </Text>
+        ),
+      };
+    }
+
+    if (col.key === 'address') {
+      return {
+        ...col,
+        render: (c) => (
+          <Text className="text-xs text-muted-foreground" style={[{ fontFamily: Fonts.body }, wrapTextStyle]}>
+            {c.address || 'â€”'}
+          </Text>
+        ),
+      };
+    }
+
+    return col;
+  });
 
   const renderCard = (c: Customer, _: boolean) => (
     <View style={globalStyles.card}>
@@ -77,7 +111,7 @@ export default function Customer() {
         <View className="flex-1"><Text className="text-base font-black text-foreground" style={{ fontFamily: Fonts.display }}>{c.name}</Text><Text className="text-xs text-muted-foreground font-mono mt-0.5">{formatIdentityDisplay(c.phone)}</Text></View>
       </View>
       {c.email && <View className="flex-row items-center gap-2 mb-2"><Mail size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{c.email}</Text></View>}
-      {c.address && <View className="flex-row items-center gap-2 mb-2"><MapPin size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground flex-1" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{c.address}</Text></View>}
+      {c.address && <View className="flex-row items-start gap-2 mb-2"><MapPin size={12} color={colors.mutedForeground} /><Text className="text-xs text-muted-foreground flex-1" style={[{ fontFamily: Fonts.body }, wrapTextStyle]}>{c.address}</Text></View>}
       <View className="flex-row items-center gap-2 mb-4">
         <Calendar size={12} color={colors.mutedForeground} />
         <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>Joined: {new Date(c.createdAt).toLocaleDateString('en-IN')}</Text>
@@ -91,7 +125,7 @@ export default function Customer() {
 
   return (
     <MasterScreenLayout title="Customers" subtitle="Manage customer directory" onAddNew={openAdd} addNewLabel="Add Customer">
-      <AdaptiveTable data={data} columns={columns} loading={isLoading} emptyText="No customers found"
+      <AdaptiveTable data={data} columns={wrappedColumns} loading={isLoading} emptyText="No customers found"
         searchValue={search} onSearchChange={setSearch}
         selectedIds={selectedIds} onSelectAll={(a) => setSelectedIds(a ? new Set(data.map(d => d.id)) : new Set())}
         onSelectRow={toggleSelect} onBulkDelete={selectedIds.size > 0 ? () => setBulkDeleteOpen(true) : undefined}
@@ -114,4 +148,3 @@ export default function Customer() {
     </MasterScreenLayout>
   );
 }
-

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { and, desc, eq, inArray, ilike, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { products, categories, uoms } from '../db/schema/category.js';
+import { products, categories, uoms, productTags, tags } from '../db/schema/category.js';
 import { toSlug, safeParseJSON } from '../utils/helpers.js';
 import { productStocks } from '../db/schema/category.js';
 import {
@@ -17,7 +17,7 @@ export const createProduct = async (req: Request, res: Response) => {
         const {
             categoryId, uomId, name, description, image, images = [],
             rank, mrp, sellingPrice, conversionQty, isActive,
-            quantity,
+            quantity, tagId,
         } = req.body;
 
         if (!categoryId || !uomId || !name || !mrp || !sellingPrice) {
@@ -55,6 +55,14 @@ export const createProduct = async (req: Request, res: Response) => {
             set: { quantity: quantity || 0, updatedAt: new Date() }
         });
 
+        // Link tag if provided
+        if (tagId) {
+            await db.insert(productTags).values({
+                productId: product.id,
+                tagId: tagId,
+            }).onConflictDoNothing();
+        }
+
         res.status(201).json({ success: true, data: product });
     } catch (error: any) {
         res.status(500).json({ success: false, msg: error.message });
@@ -67,7 +75,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         const {
             categoryId, uomId, name, description, image, images,
             rank, mrp, sellingPrice, conversionQty, isActive,
-            quantity,
+            quantity, tagId,
         } = req.body;
         if (!id) return res.status(400).json({ success: false, msg: 'Product ID required' });
 
@@ -94,6 +102,17 @@ export const updateProduct = async (req: Request, res: Response) => {
                     target: productStocks.productId,
                     set: { quantity, updatedAt: new Date() }
                 });
+        }
+
+        // Link tag if tagId parameter is present
+        if (tagId !== undefined) {
+            await db.delete(productTags).where(eq(productTags.productId, id));
+            if (tagId) {
+                await db.insert(productTags).values({
+                    productId: id,
+                    tagId: tagId,
+                }).onConflictDoNothing();
+            }
         }
 
         const [product] = await db.update(products).set(updateData).where(eq(products.id, id)).returning();
@@ -133,12 +152,41 @@ export const getAllProducts = async (req: Request, res: Response) => {
             : await baseQuery.orderBy(desc(products.rank));
         const paginated = allRows.slice(offset, offset + limitNum);
 
+        const productIds = paginated.map(row => row.products.id);
+        const relationsMap = new Map<string, { tag: any }[]>();
+
+        if (productIds.length > 0) {
+            const relations = await db
+                .select({
+                    productId: productTags.productId,
+                    tag: {
+                        id: tags.id,
+                        name: tags.name,
+                        slug: tags.slug,
+                        color: tags.color,
+                        rank: tags.rank,
+                        isActive: tags.isActive,
+                    }
+                })
+                .from(productTags)
+                .innerJoin(tags, eq(productTags.tagId, tags.id))
+                .where(inArray(productTags.productId, productIds));
+
+            for (const r of relations) {
+                if (!relationsMap.has(r.productId)) {
+                    relationsMap.set(r.productId, []);
+                }
+                relationsMap.get(r.productId)!.push({ tag: r.tag });
+            }
+        }
+
         const data = paginated.map(row => ({
             ...row.products,
             images: safeParseJSON(row.products.images as string | null),
             category: row.category,
             uom: row.uoms,
             stock: row.product_stocks,
+            productTags: relationsMap.get(row.products.id) || [],
         }));
 
         res.json({
@@ -168,6 +216,21 @@ export const getProductById = async (req: Request, res: Response) => {
         const uom = await db.select().from(uoms).where(eq(uoms.id, row[0].uomId)).limit(1);
         const stock = await db.select().from(productStocks).where(eq(productStocks.productId, row[0].id)).limit(1);
 
+        const productRelations = await db
+            .select({
+                tag: {
+                    id: tags.id,
+                    name: tags.name,
+                    slug: tags.slug,
+                    color: tags.color,
+                    rank: tags.rank,
+                    isActive: tags.isActive,
+                }
+            })
+            .from(productTags)
+            .innerJoin(tags, eq(productTags.tagId, tags.id))
+            .where(eq(productTags.productId, id));
+
         res.json({
             success: true,
             data: {
@@ -176,6 +239,7 @@ export const getProductById = async (req: Request, res: Response) => {
                 category: category[0],
                 uom: uom[0],
                 stock: stock[0],
+                productTags: productRelations,
             },
         });
     } catch (error: any) {

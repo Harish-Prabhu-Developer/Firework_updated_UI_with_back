@@ -1,4 +1,11 @@
 export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, shopInfo: any) => {
+    const formatPhone = (phone?: string | number) => {
+        if (!phone) return '';
+        const cleaned = String(phone).replace(/\D/g, '').slice(-10);
+        if (cleaned.length === 10) return `+91 ${cleaned.slice(0, 5)} ${cleaned.slice(5)}`;
+        return String(phone);
+    };
+
     const {
         invoiceNumber,
         createdAt,
@@ -25,6 +32,7 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
                 <div class="product-name">${item.productName || item.product?.name || 'Unknown Product'}</div>
                 <div class="product-slug">${item.product?.slug || ''}</div>
             </td>
+            <td class="text-center">${item.product?.uom?.code || item.productContent || item.content || ''}</td>
             <td class="text-right">${item.quantity}</td>
             <td class="text-right">₹${parseFloat(item.unitPrice).toFixed(2)}</td>
             <td class="text-right">₹${parseFloat(item.totalPrice).toFixed(2)}</td>
@@ -178,6 +186,10 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
                 text-align: right;
             }
 
+            .text-center {
+                text-align: center;
+            }
+
             .summary-section {
                 display: flex;
                 justify-content: flex-end;
@@ -248,8 +260,8 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
             <div class="header">
                 <div class="brand-section">
                     <h1>${shopInfo.shopName.toUpperCase()}</h1>
-                    <p>${shopInfo.shopAddress}</p>
-                    <p>Mob: ${shopInfo.shopPhone}${shopInfo.shopGst ? ` | GST: ${shopInfo.shopGst}` : ''}</p>
+                    <p>${shopInfo.shopAddress?.replace(/,/g, ',<br/>') || ''}</p>
+                    <p>Mob: ${formatPhone(shopInfo.shopPhone)}${shopInfo.shopGst ? ` | GST: ${shopInfo.shopGst}` : ''}</p>
                 </div>
                 <div class="header-right">
                     ${qrCodeDataUrl ? `<img src="${qrCodeDataUrl}" class="qr-code" />` : ''}
@@ -265,14 +277,13 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
                 <div class="info-box">
                     <h3>Bill To:</h3>
                     <strong>${customer.name}</strong>
-                    <p>${customer.phone}</p>
+                    <p>${formatPhone(customer.phone)}</p>
                     <p>${customer.email || ''}</p>
                     <p>${customer.address || ''}</p>
                 </div>
                 <div class="info-box">
                     <h3>Payment Info:</h3>
                     <p>Method: <span class="payment-badge">${paymentMethod}</span></p>
-                    <p>Status: <span class="payment-badge">Paid</span></p>
                 </div>
             </div>
 
@@ -281,6 +292,7 @@ export const generateInvoiceHTML = (invoiceData: any, qrCodeDataUrl: string, sho
                     <tr>
                         <th style="width: 50px;">#</th>
                         <th>Item Description</th>
+                        <th class="text-center" style="width: 100px;">Content</th>
                         <th class="text-right" style="width: 80px;">Qty</th>
                         <th class="text-right" style="width: 120px;">Price</th>
                         <th class="text-right" style="width: 120px;">Total</th>

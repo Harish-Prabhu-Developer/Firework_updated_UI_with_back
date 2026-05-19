@@ -89,8 +89,8 @@ const Footer = () => {
             <h4 className="font-display font-bold text-card mb-5">Reach Us</h4>
             <div className="space-y-6">
               <div className="flex items-start gap-2 text-sm">
-                <MapPin size={16} className="text-primary mt-0.5 shrink-0" />
-                <p className="leading-relaxed">{settings.shopAddress}</p>
+                <MapPin size={16} className="text-primary mt-1.5 shrink-0" />
+                <p className="leading-relaxed whitespace-pre-line">{settings.shopAddress}</p>
               </div>
 
               <div className="space-y-4">

@@ -27,6 +27,7 @@ export const generateInvoiceHTML2 = (invoiceData: any, qrCodeDataUrl: string, sh
                     ${item.product?.slug ? `<span class="product-desc">${item.product.slug}</span>` : ''}
                 </div>
             </td>
+            <td class="text-center">${item.product?.uom?.code || item.productContent || item.content || ''}</td>
             <td class="text-center">${item.quantity}</td>
             <td class="text-right">₹${parseFloat(item.unitPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
             <td class="text-right">₹${parseFloat(item.totalPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -245,6 +246,7 @@ export const generateInvoiceHTML2 = (invoiceData: any, qrCodeDataUrl: string, sh
                     <tr>
                         <th width="50">#</th>
                         <th>Product Description</th>
+                        <th class="text-center" width="100">Content</th>
                         <th class="text-center" width="80">Qty</th>
                         <th class="text-right" width="120">Unit Price</th>
                         <th class="text-right" width="120">Total</th>

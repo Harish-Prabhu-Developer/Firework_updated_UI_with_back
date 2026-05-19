@@ -177,32 +177,110 @@ export const saveRolePermissions = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * GET /roles/my-permissions
+ *
+ * Returns the permission map for the currently authenticated user's role.
+ *
+ * Response shape:
+ * {
+ *   success: true,
+ *   data: {
+ *     roleName: "Cashier",
+ *     isSuperAdmin: false,
+ *     permissions: {
+ *       "Categories": { "View": true,  "Create": true,  "Update": false, "Delete": false, "Bulk Delete": false, "Export": true,  "Import": false },
+ *       "Products":   { "View": true,  "Create": false, ... },
+ *       ...
+ *     }
+ *   }
+ * }
+ *
+ * The `permissions` object is keyed by modules.name and then by
+ * permissionActions.action (the slug column), e.g. "View", "Create",
+ * "Update", "Delete", "Bulk Delete", "Export", "Import".
+ * This matches exactly what the frontend hasPermission() checks against.
+ */
 export const getMyPermissions = async (req: Request, res: Response) => {
     try {
         const roleId = req.user!.roleId;
-        if (!roleId) return res.status(401).json({ success: false, msg: 'Role not assigned to user' });
+        if (!roleId) {
+            return res.status(401).json({ success: false, msg: 'No role assigned to this user' });
+        }
 
-        const perms = await db.select({
-            moduleName: modules.name,
-            actionName: permissionActions.action,
-            isAllowed: rolePermissions.isAllowed,
-            allowAll: rolePermissions.allowAll
-        })
-        .from(rolePermissions)
-        .leftJoin(modules, eq(rolePermissions.moduleId, modules.id))
-        .leftJoin(permissionActions, eq(rolePermissions.actionId, permissionActions.id))
-        .where(eq(rolePermissions.roleId, roleId));
+        // Fetch the role name so the frontend can set currentRole
+        const [roleRow] = await db
+            .select({ name: roles.name, isActive: roles.isActive })
+            .from(roles)
+            .where(eq(roles.id, roleId))
+            .limit(1);
 
-        // Format to { moduleName: { actionName: boolean } }
-        const permissionMap: any = {};
+        if (!roleRow) {
+            return res.status(403).json({ success: false, msg: 'Role not found' });
+        }
+
+        if (!roleRow.isActive) {
+            return res.status(403).json({ success: false, msg: 'Role is disabled' });
+        }
+
+        const roleName = roleRow.name;
+        const isSuperAdmin = roleName.toLowerCase() === 'super admin';
+
+        // Super Admin: no DB lookup needed — return a sentinel map
+        // The frontend already bypasses checks for Super Admin, but we
+        // also return it explicitly so the client can store the role name.
+        if (isSuperAdmin) {
+            return res.json({
+                success: true,
+                data: {
+                    roleName,
+                    isSuperAdmin: true,
+                    permissions: {},   // frontend ignores this for super admin
+                },
+            });
+        }
+
+        // Fetch permission rows for this role, joining module name + action slug
+        const perms = await db
+            .select({
+                moduleName: modules.name,
+                // Use the `action` column (slug) not the `name` column (human label)
+                // because hasPermission() on the frontend does case-insensitive match
+                // against the slug: "View", "Create", "Update", "Delete", etc.
+                actionSlug: permissionActions.action,
+                isAllowed: rolePermissions.isAllowed,
+                allowAll: rolePermissions.allowAll,
+            })
+            .from(rolePermissions)
+            .leftJoin(modules, eq(rolePermissions.moduleId, modules.id))
+            .leftJoin(permissionActions, eq(rolePermissions.actionId, permissionActions.id))
+            .where(eq(rolePermissions.roleId, roleId));
+
+        // Build { "ModuleName": { "ActionSlug": boolean } }
+        const permissionMap: Record<string, Record<string, boolean>> = {};
+
         perms.forEach(p => {
-            if (!p.moduleName) return;
-            if (!permissionMap[p.moduleName]) permissionMap[p.moduleName] = {};
-            permissionMap[p.moduleName][p.actionName!] = p.isAllowed || p.allowAll;
+            if (!p.moduleName || !p.actionSlug) return;
+
+            if (!permissionMap[p.moduleName]) {
+                permissionMap[p.moduleName] = {};
+            }
+
+            // isAllowed OR allowAll → granted
+            permissionMap[p.moduleName][p.actionSlug] =
+                Boolean(p.isAllowed) || Boolean(p.allowAll);
         });
 
-        res.json({ success: true, data: permissionMap });
+        return res.json({
+            success: true,
+            data: {
+                roleName,
+                isSuperAdmin: false,
+                permissions: permissionMap,
+            },
+        });
     } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+        console.error('[getMyPermissions] error:', error);
+        return res.status(500).json({ success: false, msg: error.message });
     }
 };

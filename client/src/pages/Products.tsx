@@ -67,7 +67,8 @@ const Products = () => {
   const getImageUrl = (img?: string) => {
     if (!img) return rockets;
     if (img.startsWith("http")) return img;
-    return `${API_BASE_URL}/${img.replace(/\\/g, '/')}`;
+    const cleanPath = img.replace(/\\/g, '/').replace(/^\//, '');
+    return `${API_BASE_URL}/${cleanPath}`;
   };
 
   const handleQuantityInput = (id: string, value: string) => {

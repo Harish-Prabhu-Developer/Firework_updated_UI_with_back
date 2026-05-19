@@ -25,6 +25,8 @@ import ScrollReveal from "@/components/ScrollReveal";
 import HeroCarousel from "@/components/HeroCarousel";
 import SEO from "@/components/SEO";
 import { useShopSettings } from "@/lib/businessInfo";
+import { useQuery } from "@tanstack/react-query";
+import { API_BASE_URL, productService } from "@/services/api";
 import sparklers from "@/assets/sparklers.jpg";
 import flowerPots from "@/assets/flower-pots.jpg";
 import chakkars from "@/assets/chakkars.jpg";
@@ -155,6 +157,62 @@ const indexStructuredData = {
 const Index = () => {
   const { settings } = useShopSettings();
 
+  const { data: dbCategories } = useQuery({
+    queryKey: ["client-categories"],
+    queryFn: productService.getCategories,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: dbFeaturedProducts } = useQuery({
+    queryKey: ["client-featured-products"],
+    queryFn: productService.getFeaturedProducts,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const getImageUrl = (img?: string) => {
+    if (!img) return chakkars;
+    if (img.startsWith("http")) return img;
+    const cleanPath = img.replace(/\\/g, '/').replace(/^\//, '');
+    return `${API_BASE_URL}/${cleanPath}`;
+  };
+
+  const getBadgeIcon = (badge: string) => {
+    switch (badge?.toLowerCase()) {
+      case "bestseller":
+        return Star;
+      case "popular":
+        return Leaf;
+      case "hot pick":
+      case "hot":
+        return Flame;
+      default:
+        return Sparkles;
+    }
+  };
+
+  const displayCategories = dbCategories && dbCategories.length > 0
+    ? dbCategories.map((cat: any) => ({
+        id: cat.id,
+        name: cat.name,
+        image: cat.image,
+        desc: `${cat.products?.length || 0} Products available`,
+        isDynamic: true,
+      }))
+    : categories.map(cat => ({ ...cat, isDynamic: false, id: cat.name }));
+
+  const displayFeaturedProducts = dbFeaturedProducts && dbFeaturedProducts.length > 0
+    ? dbFeaturedProducts.map((p: any) => ({
+        name: p.name,
+        price: p.price,
+        rating: p.rating,
+        reviews: p.reviews,
+        image: getImageUrl(p.image),
+        tag: p.tag,
+        badgeIcon: getBadgeIcon(p.badge),
+        badge: p.badge,
+      }))
+    : featuredProducts;
+
   return (
     <div className="bg-background">
       <SEO
@@ -240,7 +298,7 @@ const Index = () => {
                   </div>
                   <div>
                     <p className="font-display font-bold text-lg">Our Location</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5 whitespace-pre-line">
                       {settings.shopAddress}
                     </p>
                   </div>
@@ -325,13 +383,13 @@ const Index = () => {
             </div>
           </ScrollReveal>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {categories.map((c, i) => (
-              <ScrollReveal key={c.name} delay={i * 0.07}>
+            {displayCategories.map((c, i) => (
+              <ScrollReveal key={c.id} delay={i * 0.07}>
                 <Link to="/products" className="group relative block aspect-square rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-                  <img src={c.image} alt={c.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={c.isDynamic ? getImageUrl(c.image) : c.image} alt={c.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-linear-to-t from-foreground/80 via-foreground/20 to-transparent" />
                   <div className="absolute bottom-4 left-4">
-                    <h3 className="font-display font-bold text-card text-lg leading-tight">{c.name}</h3>
+                    <h3 className="font-display font-bold text-card text-lg leading-tight uppercase">{c.name}</h3>
                     <p className="text-card/60 text-xs mt-0.5">{c.desc}</p>
                   </div>
                 </Link>
@@ -365,7 +423,7 @@ const Index = () => {
           </ScrollReveal>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map((p, i) => (
+            {displayFeaturedProducts.map((p, i) => (
               <ScrollReveal key={p.name} delay={i * 0.1}>
                 <div className="group bg-card rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-border/50">
                   <div className="relative overflow-hidden aspect-4/3 p-4">

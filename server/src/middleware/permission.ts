@@ -4,27 +4,45 @@ import { roles, rolePermissions, modules, permissionActions } from '../db/schema
 import { eq, and } from 'drizzle-orm';
 
 /**
- * Maps route-level action keys to the `action` column value stored in
- * the `permission_actions` table.
+ * Maps route-level action keys (used in checkPermission call sites)
+ * → the `action` varchar value stored in the `permission_actions` table.
  *
- * DB stores slugs like: 'read', 'create', 'update', 'delete', …
- * (matches the `action` varchar column, NOT the human-readable `name` column)
+ * DB stores: 'View' | 'Create' | 'Update' | 'Delete' | 'Bulk Delete' | 'Export' | 'Import'
  *
- * Call site: checkPermission('categories', 'read')
- *            checkPermission('roles', 'bulkDelete')
+ * Call sites:
+ *   checkPermission('categories', 'read')        → looks up 'View'
+ *   checkPermission('categories', 'create')      → looks up 'Create'
+ *   checkPermission('roles',      'bulkDelete')  → looks up 'Bulk Delete'
+ *   checkPermission('products',   'export')      → looks up 'Export'
  */
 const ACTION_MAP: Record<string, string> = {
-    read:       'View',
-    create:     'Create',
-    update:     'Update',
-    delete:     'Delete',
+    // Lowercase aliases used in route files
+    read: 'View',
+    view: 'View',
+    create: 'Create',
+    update: 'Update',
+    edit: 'Update',
+    delete: 'Delete',
+    remove: 'Delete',
+    bulkdelete: 'Bulk Delete',
     bulkDelete: 'Bulk Delete',
-    export:     'Export',
-    import:     'Import',
+    'bulk-delete': 'Bulk Delete',
+    export: 'Export',
+    import: 'Import',
+
+    // Exact slugs (pass-through, already correct)
+    View: 'View',
+    Create: 'Create',
+    Update: 'Update',
+    Delete: 'Delete',
+    'Bulk Delete': 'Bulk Delete',
+    Export: 'Export',
+    Import: 'Import',
 };
 
 export const checkPermission = (moduleSlug: string, actionKey: string) => {
-    const resolvedAction = ACTION_MAP[actionKey] ?? actionKey;
+    // Resolve the action slug; fall through to the raw value if not in map
+    const resolvedAction = ACTION_MAP[actionKey] ?? ACTION_MAP[actionKey.toLowerCase()] ?? actionKey;
 
     return async (req: Request, res: Response, next: NextFunction) => {
         try {
@@ -39,16 +57,21 @@ export const checkPermission = (moduleSlug: string, actionKey: string) => {
 
             // ── Super Admin bypass ──────────────────────────────────────────
             const [role] = await db
-                .select({ name: roles.name })
+                .select({ name: roles.name, isActive: roles.isActive })
                 .from(roles)
                 .where(eq(roles.id, roleId))
                 .limit(1);
 
-            if (role?.name?.toLowerCase() === 'super admin') {
+            if (!role || !role.isActive) {
+                return res.status(403).json({ success: false, msg: 'Role not found or disabled' });
+            }
+
+            if (role.name.toLowerCase() === 'super admin') {
                 return next();
             }
 
-            // ── Resolve module ──────────────────────────────────────────────
+            // ── Resolve module by slug ──────────────────────────────────────
+            // moduleSlug here is the modules.slug column value (e.g. 'categories', 'roles')
             const [moduleRow] = await db
                 .select()
                 .from(modules)
@@ -58,11 +81,11 @@ export const checkPermission = (moduleSlug: string, actionKey: string) => {
             if (!moduleRow) {
                 return res.status(403).json({
                     success: false,
-                    msg: `Module '${moduleSlug}' not found`,
+                    msg: `Module '${moduleSlug}' is not registered`,
                 });
             }
 
-            // ── Resolve action ──────────────────────────────────────────────
+            // ── Resolve action by the `action` slug column ──────────────────
             const [actionRow] = await db
                 .select()
                 .from(permissionActions)
@@ -72,7 +95,7 @@ export const checkPermission = (moduleSlug: string, actionKey: string) => {
             if (!actionRow) {
                 return res.status(403).json({
                     success: false,
-                    msg: `Action '${resolvedAction}' not found`,
+                    msg: `Action '${resolvedAction}' is not registered`,
                 });
             }
 
@@ -84,8 +107,8 @@ export const checkPermission = (moduleSlug: string, actionKey: string) => {
                     and(
                         eq(rolePermissions.roleId, roleId),
                         eq(rolePermissions.moduleId, moduleRow.id),
-                        eq(rolePermissions.actionId, actionRow.id)
-                    )
+                        eq(rolePermissions.actionId, actionRow.id),
+                    ),
                 )
                 .limit(1);
 
@@ -94,11 +117,11 @@ export const checkPermission = (moduleSlug: string, actionKey: string) => {
             if (!isGranted) {
                 return res.status(403).json({
                     success: false,
-                    msg: `Permission denied: '${actionKey}' on '${moduleSlug}'`,
+                    msg: `Permission denied: '${resolvedAction}' on '${moduleRow.name}'`,
                 });
             }
 
-            next();
+            return next();
         } catch (error) {
             console.error('[checkPermission] error:', error);
             return res.status(500).json({ success: false, msg: 'Permission check failed' });

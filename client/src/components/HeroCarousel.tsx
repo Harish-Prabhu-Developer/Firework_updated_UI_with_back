@@ -13,7 +13,7 @@ import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import heroBanner from "@/assets/hero-banner.jpg";
-import sparklers from "@/assets/sparklers.jpg";
+import herodiscount from "@/assets/hero-discount.png"
 import flowerPots from "@/assets/flower-pots.jpg";
 import chakkars from "@/assets/chakkars.jpg";
 
@@ -40,7 +40,7 @@ const slides: Slide[] = [
     link: "/products",
   },
   {
-    image: sparklers,
+    image: herodiscount,
     badgeIcon: Zap,
     badge: "CLASSIC & COLORFUL",
     title: "Premium\nSparklers",
@@ -240,8 +240,8 @@ const HeroCarousel = () => {
             onClick={() => goTo(i)}
             aria-label={`Go to slide ${i + 1}`}
             className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 active:scale-95 ${i === current
-                ? "w-5 sm:w-8 bg-primary"
-                : "w-1.5 sm:w-2 bg-card/50 hover:bg-card/80"
+              ? "w-5 sm:w-8 bg-primary"
+              : "w-1.5 sm:w-2 bg-card/50 hover:bg-card/80"
               }`}
           />
         ))}

@@ -232,7 +232,20 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
             where: eq(invoices.id, invoiceId),
             with: {
                 customer: true,
-                items: true,
+                items: {
+                    with: {
+                        product: {
+                            with: {
+                                uom: true,
+                                productTags: {
+                                    with: {
+                                        tag: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
             }
         });
 

@@ -24,7 +24,7 @@ export const generatePDFFromHTML = async (
     try {
         // 2. Professional PDF Rendering Engine (Environment Awareness)
         const isProduction = process.env.NODE_ENV === 'production';
-        
+
         if (isProduction) {
             browser = await puppeteerCore.launch({
                 args: chromium.args,
@@ -40,16 +40,16 @@ export const generatePDFFromHTML = async (
         }
 
         const page = await browser.newPage();
-        
+
         // 3. A4 Precision
         await page.setContent(html, { waitUntil: 'networkidle0' });
-        
+
         const pdfBytes = await page.pdf({
             format: 'A4',
             printBackground: true,
             margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
         });
-        
+
         const pdfBuffer = Buffer.from(pdfBytes);
 
         // 4. Cleanup and Caching

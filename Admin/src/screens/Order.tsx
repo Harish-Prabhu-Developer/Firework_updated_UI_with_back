@@ -130,7 +130,7 @@ export default function Orders() {
   const columns: Column<Order>[] = [
     { key: 'orderNumber', label: 'Order #', width: 140, render: (o) => <Text className="font-black text-sm font-mono text-primary" style={{ fontFamily: Fonts.body }}>{o.orderNumber}</Text> },
     {
-      key: 'customer', label: 'Customer', width: 220, render: (o) => (
+      key: 'customer', label: 'Customer', render: (o) => (
         <View>
           <Text className="font-bold text-sm text-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{o.customer?.name || '—'}</Text>
           <Text className="text-[10px] font-mono text-muted-foreground">{formatIdentityDisplay(o.customer?.phone)}</Text>
@@ -171,7 +171,7 @@ export default function Orders() {
     { key: 'paymentMethod', label: 'Payment', width: 90, render: (o) => <StatusBadge status={o.paymentMethod} /> },
     { key: 'createdAt', label: 'Date', width: 110, render: (o) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{new Date(o.createdAt).toLocaleDateString('en-IN')}</Text> },
     {
-      key: 'actions', label: 'Actions', width: 140, render: (o) => (
+      key: 'actions', label: 'Actions', width: 210, render: (o) => (
         <View className="flex-row gap-1">
           <TouchableOpacity onPress={() => setDetailOrder(o)} className="w-8 h-8 rounded-lg bg-muted items-center justify-center"><Eye size={14} color={colors.mutedForeground} /></TouchableOpacity>
           <TouchableOpacity onPress={() => openPDF(o)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Eye size={14} color={colors.primary} /></TouchableOpacity>
@@ -302,8 +302,8 @@ export default function Orders() {
           <TouchableOpacity
             onPress={() => navigation.navigate('QrScan', { onScan: handleQrScan })}
             className="flex-row items-center px-5 h-11"
-            style={{ 
-              backgroundColor: colors.primary, 
+            style={{
+              backgroundColor: colors.primary,
               borderRadius: Radius.xl,
               gap: 10,
               shadowColor: colors.primary,
@@ -314,8 +314,8 @@ export default function Orders() {
             }}
           >
             <Scan size={18} color={colors.primaryForeground} strokeWidth={2.5} />
-            <Text 
-              className="font-bold text-sm" 
+            <Text
+              className="font-bold text-sm"
               style={{ color: colors.primaryForeground, fontFamily: Fonts.body }}
             >
               Scan Order

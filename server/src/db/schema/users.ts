@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -15,7 +16,7 @@ export const roles = pgTable("roles", {
   name: varchar("name", { length: 100 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 /* =========================
@@ -36,7 +37,7 @@ export const users = pgTable("users", {
 
   isActive: boolean("is_active").default(true),
 
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 /* =========================
@@ -46,7 +47,7 @@ export const modules = pgTable("modules", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 /* =========================
@@ -56,7 +57,7 @@ export const permissionActions = pgTable('permission_actions', {
   id: uuid('id').defaultRandom().primaryKey(),
   action: varchar('action', { length: 50 }).notNull().unique(), // 'read', 'write', etc.
   name: varchar('name', { length: 50 }).notNull(), // 'Read', 'Write', etc.
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 /* =========================
    ROLE PERMISSIONS (MATRIX)
@@ -81,7 +82,7 @@ export const rolePermissions = pgTable(
     isAllowed: boolean("is_allowed").default(false),
     allowAll: boolean("allow_all").default(false),
 
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
     roleModuleActionUnique: unique().on(
@@ -105,6 +106,53 @@ export const userSessions = pgTable("user_sessions", {
   deviceInfo: varchar("device_info", { length: 255 }),
   ipAddress: varchar("ip_address", { length: 50 }),
   expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/* =========================
+   RELATIONS
+========================= */
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  users: many(users),
+  permissions: many(rolePermissions),
+}));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  role: one(roles, {
+    fields: [users.roleId],
+    references: [roles.id],
+  }),
+  sessions: many(userSessions),
+}));
+
+export const modulesRelations = relations(modules, ({ many }) => ({
+  permissions: many(rolePermissions),
+}));
+
+export const permissionActionsRelations = relations(permissionActions, ({ many }) => ({
+  permissions: many(rolePermissions),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, {
+    fields: [rolePermissions.roleId],
+    references: [roles.id],
+  }),
+  module: one(modules, {
+    fields: [rolePermissions.moduleId],
+    references: [modules.id],
+  }),
+  action: one(permissionActions, {
+    fields: [rolePermissions.actionId],
+    references: [permissionActions.id],
+  }),
+}));
+
+export const userSessionsRelations = relations(userSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [userSessions.userId],
+    references: [users.id],
+  }),
+}));
 

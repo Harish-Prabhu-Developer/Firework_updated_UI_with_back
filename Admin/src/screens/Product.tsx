@@ -49,6 +49,7 @@ interface Product {
   mrp: string; sellingPrice: string; rank: number; isActive: boolean;
   category?: { id: string; name: string }; uom?: { id: string; code: string };
   stock?: { quantity: number };
+  productTags?: Array<{ tag: { id: string; name: string; color?: string } }>;
 }
 interface Category { id: string; name: string; isActive: boolean; }
 interface UOM { id: string; code: string; name: string; isActive: boolean; }
@@ -65,6 +66,7 @@ interface FormState {
   initialStock: string;
   isActive: boolean;
   imageUrl: string;
+  tagId: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -78,7 +80,8 @@ const EMPTY_FORM: FormState = {
   rank: '0',
   initialStock: '0',
   isActive: true,
-  imageUrl: ''
+  imageUrl: '',
+  tagId: ''
 };
 
 const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');
@@ -169,6 +172,13 @@ export const useProductQueries = () => {
       return (list ?? []) as UOM[];
     } 
   });
+  const tagsQuery = useQuery<any[]>({
+    queryKey: ['tags', 'active-list'],
+    queryFn: async () => {
+      const { data } = await api.get('/tags?limit=999999&isActive=true');
+      return data.data ?? [];
+    }
+  });
 
   const saveMutation = useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: any }) => id ? api.put(`/products/${id}`, payload) : api.post('/products', payload),
@@ -183,6 +193,7 @@ export const useProductQueries = () => {
     query: productsQuery,
     cats: catsQuery.data || [],
     uoms: uomsQuery.data || [],
+    tags: tagsQuery.data || [],
     save: saveMutation,
     remove: deleteMutation,
     bulkRemove: bulkDeleteMutation,
@@ -192,7 +203,7 @@ export const useProductQueries = () => {
 export default function Product() {
   const toast = useToast();
   const { hasPermission } = usePermissions();
-  const { query, cats, uoms, save, remove, bulkRemove } = useProductQueries();
+  const { query, cats, uoms, tags, save, remove, bulkRemove } = useProductQueries();
   const all = Array.isArray(query.data) ? query.data : [];
   const isLoading = query.isLoading;
 
@@ -241,7 +252,8 @@ export default function Product() {
       rank: String(p.rank),
       initialStock: String(p.stock?.quantity ?? 0),
       isActive: p.isActive,
-      imageUrl: p.image ?? ''
+      imageUrl: p.image ?? '',
+      tagId: p.productTags?.[0]?.tag?.id ?? ''
     });
     setImageTab(p.image ? 'url' : 'upload');
     setFormOpen(true);
@@ -310,7 +322,8 @@ export default function Product() {
         rank: Number(form.rank),
         quantity: Number(form.initialStock),
         image: form.imageUrl,
-        isActive: Boolean(form.isActive)
+        isActive: Boolean(form.isActive),
+        tagId: form.tagId || null,
       }
     }, {
       onSuccess: () => setFormOpen(false)
@@ -337,6 +350,16 @@ export default function Product() {
     { key: 'sellingPrice', label: 'Price', width: 90, align: 'right', render: (p) => <Text className="font-bold text-primary text-sm" style={{ fontFamily: Fonts.body }}>₹{parseFloat(p.sellingPrice).toFixed(2)}</Text> },
     { key: 'stock', label: 'Stock', width: 70, align: 'center', render: (p) => <Text className="font-bold text-sm" style={{ fontFamily: Fonts.body, color: (p.stock?.quantity ?? 0) === 0 ? colors.destructive : colors.success }}>{p.stock?.quantity ?? 0}</Text> },
     { key: 'uom', label: 'UOM', width: 70, render: (p) => <UOMBadge code={p.uom?.code} /> },
+    { key: 'tag', label: 'Tag', width: 100, render: (p) => {
+      const tag = p.productTags?.[0]?.tag;
+      if (!tag) return <Text className="text-muted-foreground text-[10px]" style={{ fontFamily: Fonts.body }}>-</Text>;
+      return (
+        <View style={{ backgroundColor: (tag.color ?? colors.primary) + '15', borderColor: tag.color ?? colors.primary, borderWidth: 1 }} className="flex-row items-center gap-1.5 px-2 py-0.5 rounded-full self-start">
+          <View style={{ backgroundColor: tag.color ?? colors.primary }} className="w-1.5 h-1.5 rounded-full" />
+          <Text style={{ color: tag.color ?? colors.primary, fontFamily: Fonts.body }} className="text-[9px] font-black uppercase tracking-wide" numberOfLines={1}>{tag.name}</Text>
+        </View>
+      );
+    } },
     { key: 'isActive', label: 'Status', width: 90, render: (p) => <StatusBadge status={p.isActive ? 'Active' : 'Inactive'} /> },
     { key: 'actions', label: 'Actions', width: 110, render: (p) => <View className="flex-row gap-1"><TouchableOpacity onPress={() => p.image && setPreviewUri(resolveAssetUri(p.image))} className="w-8 h-8 rounded-lg bg-muted items-center justify-center"><Eye size={14} color={colors.mutedForeground} /></TouchableOpacity><TouchableOpacity onPress={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(p.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
   ];
@@ -365,6 +388,15 @@ export default function Product() {
             <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{p.category?.name}</Text>
             <Text className="text-muted-foreground/30">•</Text>
             <UOMBadge code={p.uom?.code} />
+            {p.productTags?.[0]?.tag && (
+              <>
+                <Text className="text-muted-foreground/30">•</Text>
+                <View style={{ backgroundColor: (p.productTags[0].tag.color ?? colors.primary) + '15', borderColor: p.productTags[0].tag.color ?? colors.primary, borderWidth: 1 }} className="flex-row items-center gap-1 px-1.5 py-0.5 rounded-full self-start">
+                  <View style={{ backgroundColor: p.productTags[0].tag.color ?? colors.primary }} className="w-1 h-1 rounded-full" />
+                  <Text style={{ color: p.productTags[0].tag.color ?? colors.primary, fontFamily: Fonts.body }} className="text-[8px] font-black uppercase tracking-wide">{p.productTags[0].tag.name}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -584,6 +616,20 @@ export default function Product() {
                 placeholder="Select UOM"
               />
             </View>
+          </View>
+
+          {/* Tags Dropdown (Optional) */}
+          <View>
+            <Select
+              label="Tag (Optional)"
+              value={form.tagId}
+              onValueChange={v => setForm({ ...form, tagId: v })}
+              options={[
+                { label: 'None (Deselect)', value: '' },
+                ...tags.filter(t => t.isActive).map(t => ({ label: t.name, value: t.id }))
+              ]}
+              placeholder="No tag selected"
+            />
           </View>
 
           {/* Price Grid */}

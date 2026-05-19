@@ -19,6 +19,7 @@ import SEO from "@/components/SEO";
 import headerBg from "@/assets/header_contact_bg.png";
 import { toast } from "react-hot-toast";
 import { ADDRESS_LINES } from "@/lib/businessInfo";
+import { contactService } from "@/services/api";
 
 const contactCards = [
   {
@@ -99,18 +100,27 @@ const Contact = () => {
 
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.message.trim()) {
       toast.error("Please fill in your name and message.");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await contactService.submitMessage(form);
+      if (response.success) {
+        toast.success(response.msg || "Message submitted successfully! Our team will contact you within 2 hours.");
+        setForm({ name: "", phone: "", subject: "", message: "" });
+      } else {
+        toast.error(response.msg || "Failed to send message. Please try again.");
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.msg || error?.message || "Something went wrong. Please try again later.";
+      toast.error(errorMsg);
+    } finally {
       setLoading(false);
-      toast.success("Message submitted! Our team will contact you within 2 hours.");
-      setForm({ name: "", phone: "", subject: "", message: "" });
-    }, 1200);
+    }
   };
 
   return (
@@ -165,7 +175,7 @@ const Contact = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">Your Name *</label>
+                    <label className="text-sm font-medium mb-1.5 block">Your Name <span className="text-red-600">*</span></label>
                     <Input
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -196,7 +206,7 @@ const Contact = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">Message *</label>
+                  <label className="text-sm font-medium mb-1.5 block">Message <span className="text-red-600">*</span></label>
                   <Textarea
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}

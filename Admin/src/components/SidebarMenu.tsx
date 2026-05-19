@@ -1,5 +1,20 @@
+/**
+ * SidebarMenu.tsx
+ *
+ * Renders only the menu items the current user has "View" permission for.
+ * Dashboard and Settings are always visible (no permission gate).
+ * Each item declares its module name (must match the DB modules.name exactly).
+ */
+
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePermissions } from '../hooks/usePermissions';
@@ -17,49 +32,135 @@ import {
   Receipt,
   Image,
   Video,
-  User
+  User,
 } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { Radius, Fonts } from '../styles/globalStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UserProfileModal } from './modals/UserProfileModal';
 
-const MENU_ITEMS = [
-  { name: 'Dashboard', icon: LayoutDashboard, route: 'Dashboard' },
-  { name: 'Orders', icon: ShoppingCart, route: 'Orders' },
-  { name: 'Billing', icon: Receipt, route: 'Billing' },
-  { name: 'Customers', icon: User, route: 'Customers' },
-  { name: 'Categories', icon: FolderTree, route: 'Categories' },
-  { name: 'UOM', icon: Ruler, route: 'UOM' },
-  { name: 'Products', icon: Package, route: 'Products' },
-  { name: 'Tags', icon: Tags, route: 'Tags' },
-  { name: 'Roles', icon: Shield, route: 'Roles' },
-  { name: 'Users', icon: Users, route: 'Users' },
-  { name: 'Media', icon: Image, route: 'Media' },
-  { name: 'Videos', icon: Video, route: 'Videos' },
-  { name: 'Settings', icon: Settings, route: 'Settings' },
-];
-
-interface SidebarMenuProps {
-  isCollapsed?: boolean;
+/* ─────────────────────────────────────────────────────────────────────────────
+   Menu definition
+   `module`: must match modules.name in the DB exactly (case-insensitive lookup
+             is done in hasPermission, but keep it consistent with what you seed).
+   `alwaysShow`: skips the permission check entirely (Dashboard, Settings).
+───────────────────────────────────────────────────────────────────────────── */
+interface MenuItem {
+  name: string;
+  icon: React.ComponentType<{ size: number; color: string }>;
+  route: string;
+  /** DB module name used for View permission check */
+  module?: string;
+  /** If true, show regardless of permissions */
+  alwaysShow?: boolean;
 }
 
+const MENU_ITEMS: MenuItem[] = [
+  {
+    name: 'Dashboard',
+    icon: LayoutDashboard,
+    route: 'Dashboard',
+    alwaysShow: true,           // dashboard is always accessible
+  },
+  {
+    name: 'Orders',
+    icon: ShoppingCart,
+    route: 'Orders',
+    module: 'Orders',
+  },
+  {
+    name: 'Billing',
+    icon: Receipt,
+    route: 'Billing',
+    module: 'Invoices',         // matches modules.name seeded as "Invoices"
+  },
+  {
+    name: 'Customers',
+    icon: User,
+    route: 'Customers',
+    module: 'Customers',
+  },
+  {
+    name: 'Categories',
+    icon: FolderTree,
+    route: 'Categories',
+    module: 'Categories',
+  },
+  {
+    name: 'UOM',
+    icon: Ruler,
+    route: 'UOM',
+    module: 'UOM',
+  },
+  {
+    name: 'Products',
+    icon: Package,
+    route: 'Products',
+    module: 'Products',
+  },
+  {
+    name: 'Tags',
+    icon: Tags,
+    route: 'Tags',
+    module: 'Tags',
+  },
+  {
+    name: 'Roles',
+    icon: Shield,
+    route: 'Roles',
+    module: 'Roles',
+  },
+  {
+    name: 'Users',
+    icon: Users,
+    route: 'Users',
+    module: 'Users',
+  },
+  {
+    name: 'Media',
+    icon: Image,
+    route: 'Media',
+    module: 'Media Library',    // matches modules.name "Media Library"
+  },
+  {
+    name: 'Videos',
+    icon: Video,
+    route: 'Videos',
+    module: 'Videos',
+  },
+  {
+    name: 'Settings',
+    icon: Settings,
+    route: 'Settings',
+    alwaysShow: true,           // settings is always accessible
+  },
+];
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Component
+───────────────────────────────────────────────────────────────────────────── */
 export const SidebarMenu = (props: any) => {
   const { state, navigation: drawerNav, isCollapsed } = props;
   const fallbackNav = useNavigation<any>();
   const navigation = drawerNav || fallbackNav;
 
   const route = useRoute();
-  const currentRouteName = state ? state.routeNames[state.index] : route.name;
+  const currentRouteName = state
+    ? state.routeNames[state.index]
+    : route.name;
+
   const insets = useSafeAreaInsets();
-  const { currentRole } = usePermissions();
+  const { currentRole, hasPermission, initialized } = usePermissions();
   const [userName, setUserName] = React.useState('Admin User');
+  const [profileOpen, setProfileOpen] = React.useState(false);
 
   React.useEffect(() => {
     AsyncStorage.getItem('user').then(raw => {
-      if (raw) {
+      if (!raw) return;
+      try {
         const user = JSON.parse(raw);
-        if (user.name) setUserName(user.name);
-      }
+        if (user?.name) setUserName(user.name);
+      } catch { }
     });
   }, []);
 
@@ -68,32 +169,56 @@ export const SidebarMenu = (props: any) => {
     navigation.replace('Login');
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
+  const getInitials = (name: string) =>
+    name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
+  /* ── Filter visible items ─────────────────────────── */
+  // While permissions are loading we show nothing except always-visible items
+  // to avoid a flash of full menu followed by a collapsed one.
+  const visibleItems = MENU_ITEMS.filter(item => {
+    if (item.alwaysShow) return true;
+    if (!item.module) return false;         // no module declared → hide
+    if (!initialized) return false;         // still loading → hide until ready
+    return hasPermission(item.module, 'View');
+  });
 
   return (
-    <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 0, paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+    >
       {/* Brand */}
-
       <View style={[styles.brand, isCollapsed && styles.brandCollapsed]}>
         <View style={styles.logo}>
           <Text style={styles.logoText}>C</Text>
         </View>
         {!isCollapsed && (
           <View style={{ flex: 1 }}>
-            <Text style={styles.brandName} numberOfLines={1}>Crackers Kingdom</Text>
+            <Text style={styles.brandName} numberOfLines={1}>
+              Crackers Kingdom
+            </Text>
             <Text style={styles.brandSubtitle}>Admin Panel</Text>
           </View>
         )}
       </View>
 
+      {/* Menu Items */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        {MENU_ITEMS.map((item) => {
+        {visibleItems.map(item => {
           const isActive = currentRouteName === item.route;
           return (
             <Pressable
@@ -102,20 +227,32 @@ export const SidebarMenu = (props: any) => {
               style={({ pressed }) => [
                 isActive && styles.menuItemActive,
                 pressed && styles.menuItemPressed,
-                isCollapsed && styles.menuItemCollapsed
+                isCollapsed && styles.menuItemCollapsed,
               ]}
             >
               <View style={styles.menuItem}>
-                <View style={[styles.menuIconContainer, isCollapsed && { marginRight: 0 }]}>
+                <View
+                  style={[
+                    styles.menuIconContainer,
+                    isCollapsed && { marginRight: 0 },
+                  ]}
+                >
                   <item.icon
                     size={20}
-                    color={isActive ? colors.sidebarPrimary : 'rgba(255,255,255,0.6)'}
+                    color={
+                      isActive
+                        ? colors.sidebarPrimary
+                        : 'rgba(255,255,255,0.6)'
+                    }
                   />
                 </View>
                 {!isCollapsed && (
                   <View style={styles.menuLabelContainer}>
                     <Text
-                      style={[styles.menuLabel, isActive && styles.menuLabelActive]}
+                      style={[
+                        styles.menuLabel,
+                        isActive && styles.menuLabelActive,
+                      ]}
                       numberOfLines={1}
                     >
                       {item.name}
@@ -128,40 +265,78 @@ export const SidebarMenu = (props: any) => {
         })}
       </ScrollView>
 
-      {/* Footer / User Profile & Logout */}
+      {/* Footer — user profile + logout */}
       <View style={styles.footer}>
-        {/* User Profile */}
-        <View style={[styles.profileContainer, isCollapsed && { paddingHorizontal: 0, justifyContent: 'center' }]}>
+        <Pressable
+          onPress={() => setProfileOpen(true)}
+          style={({ pressed }) => [
+            styles.profileContainer,
+            isCollapsed && { paddingHorizontal: 0, justifyContent: 'center' },
+            pressed && { opacity: 0.7 }
+          ]}
+        >
           <View style={styles.userAvatar}>
             <Text style={styles.userAvatarText}>{getInitials(userName)}</Text>
           </View>
           {!isCollapsed && (
             <View style={styles.userInfo}>
-              <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
-              <Text style={styles.userRole} numberOfLines={1}>{currentRole || 'Administrator'}</Text>
+              <Text style={styles.userName} numberOfLines={1}>
+                {userName}
+              </Text>
+              <Text style={styles.userRole} numberOfLines={1}>
+                {currentRole || 'Administrator'}
+              </Text>
             </View>
           )}
-        </View>
+        </Pressable>
 
         <Pressable
           onPress={handleLogout}
           style={({ pressed }) => [
             pressed && styles.menuItemPressed,
-            isCollapsed && styles.menuItemCollapsed
+            isCollapsed && styles.menuItemCollapsed,
           ]}
         >
           <View style={styles.menuItem}>
-            <View style={[styles.menuIconContainer, isCollapsed && { marginRight: 0 }]}>
+            <View
+              style={[
+                styles.menuIconContainer,
+                isCollapsed && { marginRight: 0 },
+              ]}
+            >
               <LogOut size={20} color={colors.destructive} />
             </View>
-            {!isCollapsed && <Text style={[styles.logoutLabel, { color: colors.destructive }]}>Sign Out</Text>}
+            {!isCollapsed && (
+              <Text style={[styles.logoutLabel, { color: colors.destructive }]}>
+                Sign Out
+              </Text>
+            )}
           </View>
         </Pressable>
       </View>
+
+      <UserProfileModal
+        open={profileOpen}
+        onClose={() => {
+          setProfileOpen(false);
+          // Refresh user name on close in case it was edited
+          AsyncStorage.getItem('user').then(raw => {
+            if (raw) {
+              try {
+                const u = JSON.parse(raw);
+                if (u.name) setUserName(u.name);
+              } catch { }
+            }
+          });
+        }}
+      />
     </View>
   );
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Styles
+───────────────────────────────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -203,9 +378,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 12,
     paddingBottom: 20,
@@ -232,9 +405,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  userInfo: {
-    flex: 1,
-  },
+  userInfo: { flex: 1 },
   userName: {
     color: 'white',
     fontSize: 14,
@@ -264,9 +435,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  menuLabelContainer: {
-    flex: 1,
-  },
+  menuLabelContainer: { flex: 1 },
   menuItemCollapsed: {
     paddingHorizontal: 0,
     justifyContent: 'center',
@@ -284,23 +453,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.body,
   },
-  menuLabelActive: {
-    color: 'white',
-  },
+  menuLabelActive: { color: 'white' },
   footer: {
     padding: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
   },
-  logoutItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: Radius.lg,
-  },
   logoutLabel: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
     fontWeight: '600',
     fontFamily: Fonts.body,
