@@ -28,7 +28,9 @@ app.use('/assets', express.static(path.join(__dirname, '../src/assets')));
 
 // API Routes
 app.use('/api/v1', apiRoutes);
-
+app.use('/', (req, res) => {
+    res.send('Welcome to the Crackers Kingdom API!');
+})
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
