@@ -13,7 +13,7 @@ import {
 
 export const createCategory = async (req: Request, res: Response) => {
     try {
-        const { name, description, image, rank, isActive } = req.body;
+        const { name, description, image, rank, isActive, categoryDiscount } = req.body;
 
         if (!name) {
             return res.status(400).json({ success: false, msg: 'Name is required' });
@@ -31,6 +31,7 @@ export const createCategory = async (req: Request, res: Response) => {
             slug,
             description: description || null,
             image: image || null,
+            categoryDiscount: categoryDiscount !== undefined ? categoryDiscount.toString() : "0",
             rank: rank || 0,
             isActive: isActive !== undefined ? isActive : true,
         }).returning();
@@ -44,7 +45,7 @@ export const createCategory = async (req: Request, res: Response) => {
 export const updateCategory = async (req: Request, res: Response) => {
     try {
         const id = paramToString(req.params.id);
-        const { name, description, image, rank, isActive } = req.body;
+        const { name, description, image, rank, isActive, categoryDiscount } = req.body;
 
         if (!id) {
             return res.status(400).json({ success: false, msg: 'Category ID required' });
@@ -57,6 +58,7 @@ export const updateCategory = async (req: Request, res: Response) => {
         }
         if (description !== undefined) updateData.description = description;
         if (image !== undefined) updateData.image = image;
+        if (categoryDiscount !== undefined) updateData.categoryDiscount = categoryDiscount.toString();
         if (rank !== undefined) updateData.rank = rank;
         if (isActive !== undefined) updateData.isActive = isActive;
 

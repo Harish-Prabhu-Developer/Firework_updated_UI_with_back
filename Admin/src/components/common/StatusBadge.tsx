@@ -3,20 +3,28 @@ import { View, Text } from 'react-native';
 
 type Status =
   | 'Active' | 'Inactive'
+  | 'ESTIMATE_SUBMITTED' | 'PENDING_VERIFICATION' | 'REJECTED' | 'CONFIRMED' | 'READY_FOR_DISPATCH' | 'DISPATCHED' | 'DELIVERED'
   | 'pending' | 'confirmed' | 'converted' | 'cancelled'
   | 'cash' | 'upi' | 'card'
   | string;
 
 const CONFIG: Record<string, { bg: string; text: string; dot: string; label?: string }> = {
-  Active:    { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  Inactive:  { bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-400' },
-  pending:   { bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400',  label: 'Pending' },
-  confirmed: { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400',     label: 'Confirmed' },
-  converted: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Converted' },
-  cancelled: { bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400',   label: 'Cancelled' },
-  cash:      { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Cash' },
-  upi:       { bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500',  label: 'UPI' },
-  card:      { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  label: 'Card' },
+  Active:               { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  Inactive:             { bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-400' },
+  ESTIMATE_SUBMITTED:   { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500',    label: 'Estimate' },
+  PENDING_VERIFICATION: { bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400',  label: 'Verifying' },
+  REJECTED:             { bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-500',     label: 'Rejected' },
+  CONFIRMED:            { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400',     label: 'Confirmed' },
+  READY_FOR_DISPATCH:   { bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-400',  label: 'Ready' },
+  DISPATCHED:           { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  label: 'Dispatched' },
+  DELIVERED:            { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Delivered' },
+  pending:              { bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-400',  label: 'Pending' },
+  confirmed:            { bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-400',     label: 'Confirmed' },
+  converted:            { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Converted' },
+  cancelled:            { bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400',   label: 'Cancelled' },
+  cash:                 { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'Cash' },
+  upi:                  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500',  label: 'UPI' },
+  card:                 { bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  label: 'Card' },
 };
 
 interface Props {

@@ -1,864 +1,631 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import {
-  Copy,
-  Film,
-  Flame,
-  Flower2,
-  LayoutGrid,
-  Monitor,
-  Pencil,
-  Sparkles,
-  Trash2,
-  Upload,
-  Zap,
-} from 'lucide-react-native';
+// Admin/src/screens/Media.tsx
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, Platform, Animated, Modal, Pressable, useWindowDimensions } from 'react-native';
+import { Trash2, Image as ImageIcon, Video, Upload, X, Save, FileType, Link as LinkIcon, AlertTriangle, Copy, Film } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
 import { AdaptiveTable } from '../components/AdaptiveTable';
 import { FormModal } from '../components/modals/FormModal';
 import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
-import { ImagePreviewModal } from '../components/modals/ImagePreviewModal';
-import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
-import { usePermissions } from '../hooks/usePermissions';
-import { useResponsive } from '../hooks/useResponsive';
 import { useToast } from '../hooks/useToast';
+import { PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
-import { LightColors as colors } from '../styles/colors';
-import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
+import { API_URL } from '../utils/constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const MODULE = 'Media Library';
+const API_ORIGIN = API_URL.replace(/\/api\/v\d+\/?$/, '');
 
-type ViewMode = 'Hero' | 'Assets';
-type BadgeIcon = 'sparkles' | 'zap' | 'flame' | 'flower2';
-
-interface HeroSlide {
-  id: string;
-  title: string;
-  badge: string;
-  badgeIcon: BadgeIcon;
-  description: string;
-  cta: string;
-  link: string;
-  image: string;
-  displayOrder: number;
-  status: boolean;
-}
-
-interface AssetItem {
-  id: string;
-  name: string;
-  url: string;
-  type: 'image' | 'video';
-  size: number;
-  createdAt: string;
+interface MediaItem {
+  fileName: string;
   assetType: 'category' | 'products' | 'videos';
+  relativePath: string;
+  size: number;
+  updatedAt: string;
   linkedCount: number;
+  linkedRecords: { table: string; id: string; title: string; meta: string }[];
+  mimeType: string;
 }
 
-interface HeroFormState {
-  title: string;
-  badge: string;
-  badgeIcon: BadgeIcon;
-  description: string;
-  cta: string;
-  link: string;
-  image: string;
-  displayOrder: number;
-  status: boolean;
+const ASSET_LABELS: Record<string, string> = {
+  category: 'Category',
+  products: 'Product',
+  videos: 'Video',
+};
+
+const ASSET_COLORS: Record<string, string> = {
+  category: '#8b5cf6',
+  products: '#06b6d4',
+  videos: '#f43f5e',
+};
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const INITIAL_HEROES: HeroSlide[] = [
-  {
-    id: 'hero-1',
-    title: 'Festival Fireworks\nMega Showcase',
-    badge: 'Festive Spotlight',
-    badgeIcon: 'sparkles',
-    description: 'Lead with your strongest seasonal story and keep the storefront feeling fresh every week.',
-    cta: 'Shop Collection',
-    link: '/products',
-    image: 'https://picsum.photos/id/20/1920/900',
-    displayOrder: 1,
-    status: true,
-  },
-  {
-    id: 'hero-2',
-    title: 'Premium Crackers\nFor Grand Events',
-    badge: 'Top Seller',
-    badgeIcon: 'flame',
-    description: 'Highlight high-conversion banners with bold messaging and a clean call to action.',
-    cta: 'Explore Range',
-    link: '/categories',
-    image: 'https://picsum.photos/id/21/1920/900',
-    displayOrder: 2,
-    status: false,
-  },
-  {
-    id: 'hero-3',
-    title: 'Safe Celebration\nFamily Packs',
-    badge: 'Family Choice',
-    badgeIcon: 'flower2',
-    description: 'Use supporting slides to balance premium launches with evergreen offers and bundles.',
-    cta: 'View Packs',
-    link: '/offers',
-    image: 'https://picsum.photos/id/22/1920/900',
-    displayOrder: 3,
-    status: false,
-  },
-];
+function isImage(fileName: string): boolean {
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(fileName);
+}
 
-
-
-const createDefaultHeroForm = (displayOrder: number): HeroFormState => ({
-  title: '',
-  badge: '',
-  badgeIcon: 'sparkles',
-  description: '',
-  cta: '',
-  link: '/products',
-  image: 'https://picsum.photos/id/20/1920/900',
-  displayOrder,
-  status: true,
-});
-
-const getBadgeIcon = (name: BadgeIcon, size = 16, color = colors.primary) => {
-  switch (name) {
-    case 'zap':
-      return <Zap size={size} color={color} />;
-    case 'flame':
-      return <Flame size={size} color={color} />;
-    case 'flower2':
-      return <Flower2 size={size} color={color} />;
-    case 'sparkles':
-    default:
-      return <Sparkles size={size} color={color} />;
-  }
-};
-
-// Slice-like hook for Media/Hero operations
-export const useMediaQueries = () => {
-  const qc = useQueryClient();
-  const toast = useToast();
-
-  const heroesQuery = useQuery<HeroSlide[]>({
-    queryKey: ['heroes'],
-    queryFn: async () => {
-      try {
-        const { data } = await api.get('/banners');
-        const raw = data.data ?? [];
-        return raw.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          badge: item.badge,
-          badgeIcon: item.badgeIcon,
-          description: item.desc || item.description || '',
-          cta: item.cta,
-          link: item.link,
-          image: item.image,
-          displayOrder: item.displayOrder,
-          status: item.status,
-        }));
-      } catch {
-        return INITIAL_HEROES;
-      }
-    },
-    initialData: INITIAL_HEROES,
-  });
-
-  const assetsQuery = useQuery<AssetItem[]>({
-    queryKey: ['assets'],
-    queryFn: async () => {
-      try {
-        const { data } = await api.get('/media');
-        const raw = data.data ?? [];
-        return raw.map((item: any) => ({
-          id: item.fileName,
-          name: item.fileName,
-          url: item.relativePath.startsWith('http') ? item.relativePath : `${api.defaults.baseURL?.replace('/api/v1', '')}${item.relativePath}`,
-          type: (item.assetType === 'videos' || item.fileName.endsWith('.mp4')) ? 'video' : 'image',
-          size: item.size,
-          createdAt: new Date(item.updatedAt).toLocaleDateString(),
-          assetType: item.assetType,
-          linkedCount: item.linkedCount || 0,
-        }));
-      } catch {
-        return [];
-      }
-    },
-    initialData: [],
-  });
-
-  const saveHeroMutation = useMutation({
-    mutationFn: ({ id, payload }: { id?: string; payload: HeroFormState }) => {
-      const { description, ...rest } = payload;
-      const mappedPayload = {
-        ...rest,
-        desc: description,
-      };
-      return id ? api.put(`/banners/${id}`, mappedPayload) : api.post('/banners', mappedPayload);
-    },
-    onSuccess: (_, variables) => { qc.invalidateQueries({ queryKey: ['heroes'] }); toast.success(variables.id ? 'Slide updated' : 'Slide created'); },
-    onError: (e) => toast.apiError(e, 'Failed'),
-  });
-
-  const deleteHeroMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/banners/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['heroes'] }); toast.success('Slide deleted'); },
-    onError: (e) => toast.apiError(e, 'Failed'),
-  });
-
-  const uploadAssetMutation = useMutation({
-    mutationFn: async ({ type, file }: { type: 'category' | 'products' | 'videos'; file: any }) => {
-      const formData = new FormData();
-      formData.append('files', file);
-      const response = await api.post(`/media/upload/${type}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['assets'] });
-      toast.success('Asset uploaded successfully');
-    },
-    onError: (e) => toast.apiError(e, 'Failed to upload asset'),
-  });
-
-  const deleteAssetMutation = useMutation({
-    mutationFn: async ({ type, fileName }: { type: 'category' | 'products' | 'videos'; fileName: string }) => {
-      const response = await api.delete(`/media/delete/${type}/${fileName}`);
-      return response.data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['assets'] });
-      toast.success('Asset deleted successfully');
-    },
-    onError: (e) => toast.apiError(e, 'Failed to delete asset'),
-  });
-
-  return {
-    heroes: heroesQuery.data || [],
-    assets: assetsQuery.data || [],
-    isLoading: heroesQuery.isLoading || assetsQuery.isLoading,
-    saveHero: saveHeroMutation,
-    removeHero: deleteHeroMutation,
-    bulkRemoveHero: useMutation({
-      mutationFn: (ids: string[]) => api.delete('/banners/bulk', { data: { ids } }),
-      onSuccess: () => { qc.invalidateQueries({ queryKey: ['heroes'] }); toast.success('Selected slides deleted'); },
-      onError: (e) => toast.apiError(e, 'Failed'),
-    }),
-    uploadAsset: uploadAssetMutation,
-    deleteAsset: deleteAssetMutation,
-  };
-};
+function isVideo(fileName: string): boolean {
+  return /\.(mp4|mov|webm|avi|mkv)$/i.test(fileName);
+}
 
 export default function Media() {
-  const { isMobile } = useResponsive();
-  const { hasPermission } = usePermissions();
   const toast = useToast();
-
-  const { heroes, assets, isLoading, saveHero, removeHero, bulkRemoveHero, uploadAsset, deleteAsset } = useMediaQueries();
-
-  const canCreate = hasPermission(MODULE, 'Create');
-  const canUpdate = hasPermission(MODULE, 'Update');
-  const canDelete = hasPermission(MODULE, 'Delete');
-
-  const [activeMode, setActiveMode] = useState<ViewMode>('Assets');
-  const [heroSearch, setHeroSearch] = useState('');
-  const [assetSearch, setAssetSearch] = useState('');
-  const [selectedFolder, setSelectedFolder] = useState<'all' | 'category' | 'products' | 'videos'>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [heroFormOpen, setHeroFormOpen] = useState(false);
-  const [deleteHeroId, setDeleteHeroId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set<string>());
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadType, setUploadType] = useState<'category' | 'products' | 'videos'>('products');
+  const [uploading, setUploading] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [editHeroId, setEditHeroId] = useState<string | null>(null);
-  const [heroForm, setHeroForm] = useState<HeroFormState>(createDefaultHeroForm(heroes.length + 1));
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState<string>('');
-  const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
+  
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLoadedBytes, setUploadLoadedBytes] = useState(0);
+  const [uploadTotalBytes, setUploadTotalBytes] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  const filteredHeroes = useMemo(() => {
-    const query = heroSearch.trim().toLowerCase();
-    if (!query) return heroes;
-    return heroes.filter((hero) =>
-      [hero.title, hero.badge, hero.description, hero.cta, hero.link].join(' ').toLowerCase().includes(query)
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: uploadProgress,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [uploadProgress]);
+
+  const query = useQuery({
+    queryKey: ['media'],
+    queryFn: async () => {
+      const { data } = await api.get('/media');
+      return data.data ?? [];
+    },
+  });
+
+  const all: MediaItem[] = query.data ?? [];
+
+  const deleteMutation = useMutation({
+    mutationFn: (item: MediaItem) => api.delete(`/media/delete/${item.assetType}/${item.fileName}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['media'] }); toast.success('Deleted'); },
+    onError: (e: any) => toast.apiError(e, 'Delete failed'),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (items: MediaItem[]) =>
+      api.post('/media/bulk-delete', { files: items.map(i => ({ type: i.assetType, fileName: i.fileName })) }),
+    onSuccess: (_, items) => { qc.invalidateQueries({ queryKey: ['media'] }); toast.success(`Deleted ${items.length} file(s)`); },
+    onError: (e: any) => toast.apiError(e, 'Bulk delete failed'),
+  });
+
+  const data = useMemo(() => {
+    let d = all;
+    if (search) {
+      const q = search.toLowerCase();
+      d = d.filter(m => m.fileName.toLowerCase().includes(q));
+    }
+    if (filterType) d = d.filter(m => m.assetType === filterType);
+    return d;
+  }, [all, search, filterType]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleCopyUrl = useCallback(async (relativePath: string) => {
+    try {
+      await navigator.clipboard.writeText(relativePath);
+      toast.success('URL copied');
+      return;
+    } catch { /* fall through */ }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = relativePath;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      toast.success('URL copied');
+    } catch {
+      toast.error('Failed to copy URL');
+    }
+  }, [toast]);
+
+  const uploadFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadProgress(0);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) formData.append('files', files[i]);
+    
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_URL}/media/upload/${uploadType}`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadLoadedBytes(event.loaded);
+            setUploadTotalBytes(event.total);
+            setUploadProgress(Math.round((event.loaded * 100) / event.total));
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              toast.success(`${files.length} file(s) uploaded`);
+              qc.invalidateQueries({ queryKey: ['media'] });
+              setUploadOpen(false);
+              resolve(result);
+            } else {
+              reject(new Error(result?.msg || 'Upload failed'));
+            }
+          } catch (e) {
+            reject(new Error('Invalid server response'));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network request failed'));
+        xhr.send(formData as any);
+      });
+    } catch (e: any) {
+      toast.apiError(e, 'Upload failed');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleUploadClick = useCallback(() => {
+    try {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = 'image/*,video/mp4,video/webm,video/quicktime';
+      input.onchange = () => {
+        if (input.files) uploadFiles(input.files);
+      };
+      input.click();
+    } catch {
+      setUploading(false);
+    }
+  }, [uploadType, toast, qc]);
+
+  const TypeBadge = ({ type }: { type: string }) => (
+    <View
+      className="flex-row items-center gap-1 px-2 py-0.5 rounded-full"
+      style={{
+        backgroundColor: `${ASSET_COLORS[type]}15`,
+        borderWidth: 1,
+        borderColor: `${ASSET_COLORS[type]}30`,
+        flexShrink: 0,
+        alignSelf: 'center',  // never fight the cell's alignItems
+      }}
+    >
+      {type === 'videos' ? <Video size={10} color={ASSET_COLORS[type]} /> : <ImageIcon size={10} color={ASSET_COLORS[type]} />}
+      <Text style={{ color: ASSET_COLORS[type], fontSize: 9, fontWeight: '900', textTransform: 'uppercase' }}>
+        {ASSET_LABELS[type] || type}
+      </Text>
+    </View>
+  );
+
+  // count=0 used to return null, leaving the cell empty and rows at different heights.
+  // Now it renders a subtle dash so every row has a consistent baseline.
+  // alignSelf:'center' replaces self-start so it doesn't fight the table cell's alignItems.
+  const LinkedIndicator = ({ count, compact = false }: { count: number; compact?: boolean }) => {
+    if (count === 0) {
+      return compact ? null : (
+        <Text style={{ fontSize: 11, color: '#cbd5e1' }}>—</Text>
+      );
+    }
+    return (
+      <View
+        className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100"
+        style={{ flexShrink: 0, alignSelf: 'center' }}
+      >
+        <LinkIcon size={9} color="#d97706" />
+        <Text className="text-[9px] font-bold text-amber-700">{count} link{count > 1 ? 's' : ''}</Text>
+      </View>
     );
-  }, [heroSearch, heroes]);
-
-  const filteredAssets = useMemo(() => {
-    let result = assets;
-    if (selectedFolder !== 'all') {
-      result = assets.filter((asset) => asset.assetType === selectedFolder);
-    }
-    const query = assetSearch.trim().toLowerCase();
-    if (!query) return result;
-    return result.filter((asset) => asset.name.toLowerCase().includes(query));
-  }, [assetSearch, assets, selectedFolder]);
-
-  const totalLibrarySize = useMemo(() => {
-    return assets.reduce((sum, asset) => sum + (asset.size || 0), 0);
-  }, [assets]);
-
-  const filteredFolderSize = useMemo(() => {
-    return filteredAssets.reduce((sum, asset) => sum + (asset.size || 0), 0);
-  }, [filteredAssets]);
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const activeHero = heroes.find((hero) => hero.status) ?? heroes[0];
-
-  const openAddHero = () => {
-    if (!canCreate) {
-      toast.warn('You do not have permission to create slides');
-      return;
-    }
-    setEditHeroId(null);
-    setHeroForm(createDefaultHeroForm(heroes.length + 1));
-    setHeroFormOpen(true);
-  };
-
-  const openEditHero = (hero: HeroSlide) => {
-    if (!canUpdate) {
-      toast.warn('You do not have permission to edit slides');
-      return;
-    }
-    setEditHeroId(hero.id);
-    setHeroForm({
-      title: hero.title,
-      badge: hero.badge,
-      badgeIcon: hero.badgeIcon,
-      description: hero.description,
-      cta: hero.cta,
-      link: hero.link,
-      image: hero.image,
-      displayOrder: hero.displayOrder,
-      status: hero.status,
-    });
-    setHeroFormOpen(true);
-  };
-
-  const handleHeroSubmit = () => {
-    if (!heroForm.title.trim() || !heroForm.badge.trim() || !heroForm.image.trim()) {
-      toast.error('Title, badge, and image are required');
-      return;
-    }
-    saveHero.mutate({ id: editHeroId ?? undefined, payload: heroForm }, {
-      onSuccess: () => { setHeroFormOpen(false); setEditHeroId(null); }
-    });
-  };
-
-  const handleDeleteHero = () => {
-    if (!deleteHeroId) return;
-    removeHero.mutate(deleteHeroId, {
-      onSuccess: () => setDeleteHeroId(null)
-    });
-  };
-
-  const heroColumns: Column<HeroSlide>[] = [
+  // FIX: long file names were not being clipped on web. A flex child's default
+  // min-width is its own content width (not 0), so `numberOfLines` on <Text>
+  // never actually kicked in — the name kept its full intrinsic width and
+  // visually overflowed into the Type/Links columns, rendering underneath
+  // those badges. Giving the text wrapper `minWidth: 0` + `overflow: hidden`
+  // (and ellipsizeMode for the web text-overflow CSS) forces it to shrink to
+  // the column and truncate with "…" instead of bleeding into siblings.
+  const columns: Column<MediaItem>[] = [
     {
-      key: 'preview',
-      label: 'Visual',
-      width: 120,
-      render: (hero) => (
-        <View className="h-12 w-20 rounded-lg overflow-hidden border border-border">
-          <Image source={{ uri: hero.image }} className="w-full h-full" resizeMode="cover" />
-        </View>
-      ),
-    },
-    {
-      key: 'title',
-      label: 'Hero Title',
+      key: 'fileName',
+      label: 'File',
       width: 250,
-      render: (hero) => (
-        <View>
-          <Text style={{ fontFamily: Fonts.body }} className="font-bold text-sm text-foreground" numberOfLines={1}>
-            {hero.title.replace('\n', ' ')}
-          </Text>
-          <Text style={{ fontFamily: Fonts.body }} className="text-[10px] text-muted-foreground mt-1" numberOfLines={1}>
-            {hero.description}
-          </Text>
+      render: (v) => (
+        <View className="flex-row items-center gap-3" style={{ minWidth: 0, maxWidth: '100%' }}>
+          <TouchableOpacity
+            onPress={() => setPreviewItem(v)}
+            activeOpacity={0.8}
+            className="w-10 h-10 rounded-lg bg-slate-100 items-center justify-center overflow-hidden border border-slate-200"
+            style={{ flexShrink: 0 }}
+          >
+            {isImage(v.fileName) ? (
+              <Image source={{ uri: `${API_ORIGIN}${v.relativePath}` }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+            ) : (
+              <Video size={18} color="#94a3b8" />
+            )}
+          </TouchableOpacity>
+          <View className="flex-1" style={{ minWidth: 0, overflow: 'hidden' }}>
+            <Text
+              className="font-bold text-sm text-foreground"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ overflow: 'hidden' }}
+            >
+              {v.fileName}
+            </Text>
+            <Text className="text-[10px] text-muted-foreground">{formatSize(v.size)}</Text>
+          </View>
         </View>
       ),
     },
     {
-      key: 'badge',
-      label: 'Badge',
-      width: 160,
-      render: (hero) => (
-        <View className="flex-row items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full self-start">
-          {getBadgeIcon(hero.badgeIcon, 11, colors.primary)}
-          <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-bold text-primary">{hero.badge}</Text>
-        </View>
-      ),
-    },
-    {
-      key: 'displayOrder',
-      label: 'Order',
-      width: 90,
-      align: 'center',
-      render: (hero) => <Text style={{ fontFamily: Fonts.body }} className="font-bold text-sm text-foreground">{hero.displayOrder}</Text>,
-    },
-    {
-      key: 'status',
-      label: 'Status',
+      key: 'assetType',
+      label: 'Type',
       width: 100,
-      render: (hero) => <StatusBadge status={hero.status ? 'Active' : 'Inactive'} />,
+      render: (v) => <TypeBadge type={v.assetType} />,
+    },
+    {
+      key: 'linkedCount',
+      label: 'Links',
+      width: 110,
+      render: (v) => (
+        <View style={{ alignItems: 'flex-start' }}>
+          <LinkedIndicator count={v.linkedCount} />
+        </View>
+      ),
+    },
+    {
+      key: 'updatedAt',
+      label: 'Updated',
+      width: 150,
+      render: (v) => <Text className="text-xs text-muted-foreground">{new Date(v.updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>,
     },
     {
       key: 'actions',
       label: 'Actions',
-      width: 110,
-      render: (hero) => (
+      width: 130,
+      render: (v) => (
         <View className="flex-row gap-1">
           <TouchableOpacity
-            onPress={() => openEditHero(hero)}
-            disabled={!canUpdate}
-            className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"
-            style={{ opacity: canUpdate ? 1 : 0.5 }}
+            onPress={() => handleCopyUrl(v.relativePath)}
+            className="w-8 h-8 rounded-lg bg-slate-100 items-center justify-center"
           >
-            <Pencil size={14} color={colors.primary} />
+            <Copy size={14} color="#64748b" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setDeleteHeroId(hero.id)}
-            disabled={!canDelete}
-            className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"
-            style={{ opacity: canDelete ? 1 : 0.5 }}
-          >
-            <Trash2 size={14} color={colors.destructive} />
-          </TouchableOpacity>
+          <PermissionGuard module="Media Library" action="Delete">
+            <TouchableOpacity
+              onPress={() => setDeleteId(`${v.assetType}::${v.fileName}`)}
+              className="w-8 h-8 rounded-lg bg-red-50 items-center justify-center"
+            >
+              <Trash2 size={14} color="#ef4444" />
+            </TouchableOpacity>
+          </PermissionGuard>
         </View>
       ),
     },
   ];
 
-  return (
-    <MasterScreenLayout
-      title="Hero & Assets"
-      subtitle="Manage storefront banners and media files"
-      module={MODULE}
-      scrollable={false}
-      onAddNew={activeMode === 'Hero' ? openAddHero : undefined}
-      addNewLabel="Add Slide"
-      extraHeaderContent={
-        <View className="flex-row bg-muted p-1 rounded-2xl border border-border/60">
+  const renderCard = (v: MediaItem, _: boolean) => {
+    const deleteKey = `${v.assetType}::${v.fileName}`;
+    return (
+      <View className="p-4">
+        <View className="flex-row items-center gap-2 mb-3">
           <TouchableOpacity
-            className={`px-4 py-2 rounded-xl flex-row items-center gap-2 ${activeMode === 'Assets' ? 'bg-card shadow-sm shadow-primary/20' : ''}`}
-            onPress={() => setActiveMode('Assets')}
+            onPress={() => setPreviewItem(v)}
+            activeOpacity={0.8}
+            className="w-14 h-14 rounded-xl bg-slate-100 items-center justify-center overflow-hidden border border-slate-200"
+            style={{ flexShrink: 0 }}
           >
-            <LayoutGrid size={14} color={activeMode === 'Assets' ? colors.primary : colors.mutedForeground} />
-            <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${activeMode === 'Assets' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Assets
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className={`px-4 py-2 rounded-xl flex-row items-center gap-2 ${activeMode === 'Hero' ? 'bg-card shadow-sm shadow-primary/20' : ''}`}
-            onPress={() => setActiveMode('Hero')}
-          >
-            <Monitor size={14} color={activeMode === 'Hero' ? colors.primary : colors.mutedForeground} />
-            <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${activeMode === 'Hero' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Banners
-            </Text>
-          </TouchableOpacity>
-        </View>
-      }
-    >
-      {activeMode === 'Hero' ? (
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => {
-              if (activeHero) {
-                setPreviewUri(activeHero.image);
-                setPreviewName(activeHero.title);
-                setPreviewType('image');
-              }
-            }}
-          >
-            <Card style={{ borderRadius: Radius['3xl'] }} className="mb-6 overflow-hidden border-0">
-              <View className="absolute inset-0 bg-black/35 z-10" />
-              <Image
-                source={{ uri: activeHero?.image ?? 'https://picsum.photos/id/20/1920/900' }}
-                className="w-full h-[280px]"
-                resizeMode="cover"
-              />
-              <View className="absolute inset-0 z-20 p-6 justify-center">
-                <View className="flex-row items-center gap-2 mb-4">
-                  <View className="h-8 w-8 rounded-full bg-white/20 items-center justify-center">
-                    {activeHero ? getBadgeIcon(activeHero.badgeIcon, 16, '#ffffff') : null}
-                  </View>
-                  <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-white bg-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                    {activeHero?.badge ?? 'No Active Slide'}
-                  </Text>
-                </View>
-                <Text style={{ fontFamily: Fonts.display }} className="text-3xl font-black text-white leading-tight mb-3">
-                  {activeHero?.title ?? 'Media Manager'}
-                </Text>
-                <Text style={{ fontFamily: Fonts.body }} className="text-sm text-white/80 leading-relaxed mb-6 max-w-[85%]">
-                  {activeHero?.description ?? 'Use the slide inventory below to keep the storefront visuals fresh and consistent.'}
-                </Text>
-                <View style={{ borderRadius: Radius.full }} className="self-start bg-white px-6 py-3">
-                  <Text style={{ fontFamily: Fonts.body }} className="text-xs font-black text-primary uppercase tracking-widest">
-                    {activeHero?.cta ?? 'Learn More'}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          </TouchableOpacity>
-
-          <AdaptiveTable
-            data={filteredHeroes}
-            columns={heroColumns}
-            loading={isLoading}
-            emptyText="No slides match your search"
-            searchValue={heroSearch}
-            onSearchChange={setHeroSearch}
-            selectedIds={selectedIds}
-            onSelectAll={(all) =>
-              setSelectedIds(all ? new Set(filteredHeroes.map((hero) => hero.id)) : new Set<string>())
-            }
-            onSelectRow={(id) =>
-              setSelectedIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(id)) {
-                  next.delete(id);
-                } else {
-                  next.add(id);
-                }
-                return next;
-              })
-            }
-            onBulkDelete={
-              canDelete && selectedIds.size > 0
-                ? () => setBulkDeleteOpen(true)
-                : undefined
-            }
-            exportTitle="Hero Slides"
-            exportFilename="hero-slides"
-            renderCard={(hero) => (
-              <View style={globalStyles.card}>
-                <View className="flex-row items-center gap-3 mb-4">
-                  <View className="h-16 w-24 rounded-2xl overflow-hidden border border-border">
-                    <Image source={{ uri: hero.image }} className="w-full h-full" resizeMode="cover" />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between gap-2">
-                      <Text style={{ fontFamily: Fonts.body }} className="font-black text-foreground flex-1" numberOfLines={1}>
-                        {hero.title.replace('\n', ' ')}
-                      </Text>
-                      <StatusBadge status={hero.status ? 'Active' : 'Inactive'} />
-                    </View>
-                    <Text style={{ fontFamily: Fonts.body }} className="text-xs text-muted-foreground mt-1" numberOfLines={2}>
-                      {hero.description}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-row items-center justify-between bg-primary/5 px-3 py-2 rounded-xl">
-                  <View className="flex-row items-center gap-2">
-                    {getBadgeIcon(hero.badgeIcon, 12, colors.primary)}
-                    <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-bold text-primary uppercase">{hero.badge}</Text>
-                  </View>
-                  <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-bold text-muted-foreground uppercase">Order #{hero.displayOrder}</Text>
-                </View>
-                <View className="flex-row border-t border-border/40 mt-4 pt-4 gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onPress={() => openEditHero(hero)} disabled={!canUpdate}>
-                    <Pencil size={14} color={colors.primary} />
-                    <Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-primary">Edit</Text>
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1" onPress={() => setDeleteHeroId(hero.id)} disabled={!canDelete}>
-                    <Trash2 size={14} color={colors.destructive} />
-                    <Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-destructive">Delete</Text>
-                  </Button>
-                </View>
-              </View>
+            {isImage(v.fileName) ? (
+              <Image source={{ uri: `${API_ORIGIN}${v.relativePath}` }} style={{ width: 56, height: 56 }} resizeMode="cover" />
+            ) : (
+              <Video size={24} color="#94a3b8" />
             )}
-          />
-        </ScrollView>
-      ) : (
-        <View style={{ flex: 1 }}>
-          <View className="mb-5">
-            <View className="flex-row items-center gap-3 mb-4">
-              <View className="flex-1">
-                <Input
-                  value={assetSearch}
-                  onChangeText={setAssetSearch}
-                  placeholder="Search media files"
-                />
-              </View>
-              <Button
-                size="md"
-                className="px-4"
-                onPress={() => {
-                  const targetFolder = selectedFolder === 'all' ? 'products' : selectedFolder;
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = targetFolder === 'videos' ? 'video/mp4' : 'image/*';
-                  input.onchange = (e: any) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      uploadAsset.mutate({ type: targetFolder, file });
-                    }
-                  };
-                  input.click();
-                }}
-                loading={uploadAsset.isPending}
-                disabled={!canCreate}
-              >
-                <Upload size={14} color={colors.primaryForeground} />
-                <Text style={{ fontFamily: Fonts.body }} className="text-white font-bold text-xs uppercase ml-1">Upload</Text>
-              </Button>
-            </View>
-
-            <View className="flex-row items-center justify-between flex-wrap gap-3">
-              <View className="flex-row gap-2 flex-wrap">
-                {(['all', 'category', 'products', 'videos'] as const).map((folder) => (
-                  <TouchableOpacity
-                    key={folder}
-                    className={`px-4 py-2 rounded-xl border ${selectedFolder === folder ? 'bg-primary/10 border-primary' : 'bg-muted border-border/60'}`}
-                    onPress={() => setSelectedFolder(folder)}
-                  >
-                    <Text style={{ fontFamily: Fonts.body }} className={`text-[10px] font-black uppercase ${selectedFolder === folder ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {folder}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/20 flex-row items-center gap-2">
-                <Text style={{ fontFamily: Fonts.body }} className="text-[10px] font-black text-primary uppercase">
-                  {selectedFolder === 'all' ? 'Total Library Size' : `${selectedFolder} Folder Size`}: {formatSize(selectedFolder === 'all' ? totalLibrarySize : filteredFolderSize)}
-                </Text>
-              </View>
+          </TouchableOpacity>
+          <View className="flex-1" style={{ minWidth: 0, overflow: 'hidden' }}>
+            <Text
+              className="font-bold text-foreground text-sm"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ overflow: 'hidden' }}
+            >
+              {v.fileName}
+            </Text>
+            <Text className="text-[10px] text-muted-foreground mt-0.5">{formatSize(v.size)}</Text>
+            <View className="flex-row items-center gap-2 mt-1.5" style={{ flexWrap: 'wrap' }}>
+              <TypeBadge type={v.assetType} />
+              <LinkedIndicator count={v.linkedCount} compact />
             </View>
           </View>
-
-          <FlatList
-            data={filteredAssets}
-            keyExtractor={(item) => item.id}
-            numColumns={isMobile ? 2 : 4}
-            style={{ flex: 1 }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-            ListEmptyComponent={
-              <View className="py-16 items-center">
-                <Text style={{ fontFamily: Fonts.body }} className="text-sm text-muted-foreground">No assets match your search</Text>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={{ width: isMobile ? '50%' : '25%' }}
-                className="p-2"
-                onPress={() => {
-                  setPreviewUri(item.url);
-                  setPreviewName(item.name);
-                  setPreviewType(item.type);
-                }}
-              >
-                <Card style={{ borderRadius: Radius.xl }} className="overflow-hidden border border-border bg-card">
-                  <View className="aspect-square bg-muted items-center justify-center">
-                    {item.type === 'image' ? (
-                      <Image source={{ uri: item.url }} className="w-full h-full" resizeMode="cover" />
-                    ) : (
-                      <Film size={32} color={colors.mutedForeground} />
-                    )}
-                    <View className="absolute top-3 right-3 bg-black/60 px-2 py-0.5 rounded-full">
-                      <Text style={{ fontFamily: Fonts.body }} className="text-[8px] font-black text-white uppercase">{item.type}</Text>
-                    </View>
-                  </View>
-                  <View className="p-3">
-                    <Text style={{ fontFamily: Fonts.body }} className="text-xs font-black text-foreground mb-1" numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={{ fontFamily: Fonts.body }} className="text-[10px] text-muted-foreground mb-3">
-                      {(item.size / 1024).toFixed(0)} KB • {item.createdAt}
-                      {`\nFolder: ${item.assetType} • Linked: ${item.linkedCount}`}
-                    </Text>
-                    <View className="flex-row items-center justify-between">
-                      <StatusBadge status={item.linkedCount > 0 ? 'Active' : 'Inactive'} />
-                      <View className="flex-row gap-2">
-                        <TouchableOpacity onPress={(e) => {
-                          e.stopPropagation();
-                          if (navigator.clipboard) {
-                            navigator.clipboard.writeText(item.url);
-                            toast.success('Asset URL copied!');
-                          } else {
-                            toast.info(`Asset URL: ${item.url}`);
-                          }
-                        }}>
-                          <Copy size={14} color={colors.primary} />
-                        </TouchableOpacity>
-                        {canDelete && (
-                          <TouchableOpacity onPress={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Are you sure you want to delete this asset?`)) {
-                              deleteAsset.mutate({ type: item.assetType, fileName: item.name });
-                            }
-                          }}>
-                            <Trash2 size={14} color={colors.destructive} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                </Card>
-              </TouchableOpacity>
-            )}
-          />
         </View>
-      )}
+        <View className="flex-row border-t border-border/40 pt-2">
+          <TouchableOpacity
+            onPress={() => handleCopyUrl(v.relativePath)}
+            className="flex-1 py-2.5 flex-row items-center justify-center gap-2 border-r border-border/40"
+          >
+            <Copy size={13} color="#64748b" />
+            <Text className="text-xs font-bold text-slate-500">Copy URL</Text>
+          </TouchableOpacity>
+          <PermissionGuard module="Media Library" action="Delete">
+            <TouchableOpacity
+              onPress={() => setDeleteId(deleteKey)}
+              className="flex-1 py-2.5 flex-row items-center justify-center gap-2"
+            >
+              <Trash2 size={13} color="#ef4444" />
+              <Text className="text-xs font-bold text-red-500">Delete</Text>
+            </TouchableOpacity>
+          </PermissionGuard>
+        </View>
+      </View>
+    );
+  };
+
+  const resolveDeleteItem = (): MediaItem | null => {
+    if (!deleteId) return null;
+    const [assetType, ...nameParts] = deleteId.split('::');
+    const fileName = nameParts.join('::');
+    return all.find(m => m.assetType === assetType && m.fileName === fileName) || null;
+  };
+
+  const deleteItem = resolveDeleteItem();
+  const selectedItems = useMemo(() => {
+    if (selectedIds.size === 0) return [];
+    return all.filter(m => selectedIds.has(`${m.assetType}::${m.fileName}`));
+  }, [all, selectedIds]);
+
+  return (
+    <MasterScreenLayout
+      title="Media Library"
+      subtitle="Manage uploaded images and videos"
+      module="Media Library"
+      onAddNew={() => setUploadOpen(true)}
+      addNewLabel="Upload Files"
+    >
+      <AdaptiveTable
+        data={data}
+        columns={columns}
+        loading={query.isLoading}
+        emptyText="No media files found"
+        searchValue={search}
+        onSearchChange={setSearch}
+        filters={[
+          {
+            key: 'type', label: 'Type', options: [
+              { label: 'Category', value: 'category' },
+              { label: 'Product', value: 'products' },
+              { label: 'Video', value: 'videos' },
+            ]
+          },
+        ]}
+        filterValues={{ type: filterType }}
+        onFilterChange={(k, v) => { if (k === 'type') setFilterType(v); }}
+        selectedIds={selectedIds}
+        onSelectAll={(a) => setSelectedIds(a ? new Set(data.map(d => `${d.assetType}::${d.fileName}`)) : new Set())}
+        onSelectRow={toggleSelect}
+        onBulkDelete={selectedIds.size > 0 ? () => setBulkDeleteOpen(true) : undefined}
+        exportTitle="Media Library Report"
+        exportFilename="media-library"
+        renderCard={renderCard}
+        module="Media Library"
+      />
 
       <FormModal
-        open={heroFormOpen}
-        onClose={() => setHeroFormOpen(false)}
-        title={editHeroId ? 'Edit Hero Slide' : 'Add Hero Slide'}
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Upload Files"
         footer={
-          <View className="flex-row gap-3">
-            <Button variant="outline" label="Cancel" className="flex-1" onPress={() => setHeroFormOpen(false)} />
-            <Button
-              label={editHeroId ? 'Update Slide' : 'Create Slide'}
-              className="flex-1"
-              onPress={handleHeroSubmit}
-              loading={saveHero.isPending}
-            />
+          <View className="flex-row justify-end gap-3">
+            <TouchableOpacity
+              onPress={() => setUploadOpen(false)}
+              className="px-6 h-11 rounded-xl border border-border items-center justify-center flex-row gap-2 bg-white"
+            >
+              <X size={16} color="#64748b" />
+              <Text className="text-sm font-bold text-foreground">Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleUploadClick}
+              disabled={uploading}
+              className="px-6 h-11 rounded-xl bg-primary items-center justify-center flex-row gap-2"
+            >
+              <Upload size={16} color="white" />
+              <Text className="text-sm font-bold text-white">{uploading ? 'Uploading…' : 'Upload'}</Text>
+            </TouchableOpacity>
           </View>
         }
       >
-        <View className="gap-4">
-          <View style={{ borderRadius: Radius.xl }} className="w-full aspect-[2/1] overflow-hidden border border-border bg-muted">
-            <Image source={{ uri: heroForm.image }} className="w-full h-full" resizeMode="cover" />
-          </View>
-
-          <Input
-            label="Banner Image URL"
-            value={heroForm.image}
-            onChangeText={(value) => setHeroForm((prev) => ({ ...prev, image: value }))}
-            placeholder="https://example.com/banner.jpg"
-          />
-
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Select
-                label="Accent Icon"
-                value={heroForm.badgeIcon}
-                onValueChange={(value) => setHeroForm((prev) => ({ ...prev, badgeIcon: value as BadgeIcon }))}
-                options={[
-                  { label: 'Sparkles', value: 'sparkles' },
-                  { label: 'Zap', value: 'zap' },
-                  { label: 'Flame', value: 'flame' },
-                  { label: 'Flower', value: 'flower2' },
-                ]}
-              />
-            </View>
-            <View className="flex-1">
-              <Input
-                label="Display Order"
-                value={String(heroForm.displayOrder)}
-                onChangeText={(value) =>
-                  setHeroForm((prev) => ({
-                    ...prev,
-                    displayOrder: Number(value) || 1,
-                  }))
-                }
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <Input
-            label="Badge Text"
-            value={heroForm.badge}
-            onChangeText={(value) => setHeroForm((prev) => ({ ...prev, badge: value }))}
-            placeholder="Festive Spotlight"
-          />
-
-          <Input
-            label="Headline"
-            value={heroForm.title}
-            onChangeText={(value) => setHeroForm((prev) => ({ ...prev, title: value }))}
-            placeholder={"Grand Festive\nMega Sale"}
-          />
-
-          <Input
-            label="Description"
-            value={heroForm.description}
-            onChangeText={(value) => setHeroForm((prev) => ({ ...prev, description: value }))}
-            placeholder="Tell the shopper why this slide matters."
-            multiline
-          />
-
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Input
-                label="CTA Label"
-                value={heroForm.cta}
-                onChangeText={(value) => setHeroForm((prev) => ({ ...prev, cta: value }))}
-                placeholder="Shop Now"
-              />
-            </View>
-            <View className="flex-1">
-              <Input
-                label="Redirect Link"
-                value={heroForm.link}
-                onChangeText={(value) => setHeroForm((prev) => ({ ...prev, link: value }))}
-                placeholder="/products"
-              />
+        <View className="gap-5">
+          <View className="gap-1.5">
+            <Text className="text-[13px] font-bold text-foreground ml-1">
+              Asset Type <Text className="text-destructive">*</Text>
+            </Text>
+            <View className="flex-row gap-2">
+              {(['category', 'products', 'videos'] as const).map(type => (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => setUploadType(type)}
+                  className={`flex-1 h-12 rounded-xl flex-row items-center justify-center gap-2 border ${uploadType === type ? 'bg-primary border-primary' : 'bg-white border-slate-200'
+                    }`}
+                >
+                  {type === 'videos' ? (
+                    <Video size={15} color={uploadType === type ? 'white' : '#94a3b8'} />
+                  ) : (
+                    <ImageIcon size={15} color={uploadType === type ? 'white' : '#94a3b8'} />
+                  )}
+                  <Text className={`text-xs font-bold ${uploadType === type ? 'text-white' : 'text-slate-500'}`}>
+                    {ASSET_LABELS[type]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
           <TouchableOpacity
-            style={{ borderRadius: Radius.xl }}
-            className={`h-11 items-center justify-center border ${heroForm.status ? 'bg-primary/5 border-primary/20' : 'bg-muted border-border'}`}
-            onPress={() => setHeroForm((prev) => ({ ...prev, status: !prev.status }))}
+            activeOpacity={0.8}
+            onPress={handleUploadClick}
+            disabled={uploading}
+            // @ts-ignore Web drag and drop events
+            onDragOver={(e: any) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={(e: any) => { e.preventDefault(); setIsDragging(false); }}
+            onDrop={(e: any) => {
+              e.preventDefault();
+              setIsDragging(false);
+              if (uploading) return;
+              if (e.dataTransfer?.files) {
+                uploadFiles(e.dataTransfer.files);
+              }
+            }}
+            className="border-2 border-dashed rounded-xl p-10 items-center justify-center overflow-hidden"
+            style={{ 
+              borderColor: isDragging ? '#6366f1' : '#cbd5e1', 
+              backgroundColor: isDragging ? '#eef2ff' : '#ffffff',
+              minHeight: 180
+            }}
           >
-            <Text style={{ fontFamily: Fonts.body }} className={`text-xs font-bold uppercase ${heroForm.status ? 'text-primary' : 'text-muted-foreground'}`}>
-              {heroForm.status ? 'Live on storefront' : 'Hidden from storefront'}
-            </Text>
+            {uploading ? (
+              <View style={{ width: '100%', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#6366f1', marginBottom: 12 }}>
+                  Uploading... {uploadProgress}%
+                </Text>
+                <View style={{ width: '100%', height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                  <Animated.View style={{ height: '100%', backgroundColor: '#6366f1', width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} />
+                </View>
+                {uploadTotalBytes > 0 && (
+                  <Text style={{ fontSize: 11, color: '#64748b' }}>
+                    {(uploadLoadedBytes / (1024 * 1024)).toFixed(2)} MB / {(uploadTotalBytes / (1024 * 1024)).toFixed(2)} MB
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <>
+                <Upload size={36} color="#6366f1" />
+                <Text className="text-sm font-bold text-foreground mt-3">
+                  {isDragging ? 'Drop files here' : 'Click or drag to Upload Files'}
+                </Text>
+                <Text className="text-[11px] text-muted-foreground mt-1 text-center">
+                  Supports images and videos up to 100MB
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
+
+          <View className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex-row items-start gap-2.5">
+            <AlertTriangle size={14} color="#d97706" style={{ marginTop: 1 }} />
+            <Text className="text-[11px] text-amber-800 flex-1 leading-relaxed">
+              Linked files cannot be deleted. Remove the link from the associated product, category, or video first.
+            </Text>
+          </View>
         </View>
       </FormModal>
 
       <DeleteConfirmModal
-        open={!!deleteHeroId}
-        onOpenChange={(open) => {
-          if (!open) setDeleteHeroId(null);
+        open={!!deleteItem}
+        onOpenChange={(v) => !v && setDeleteId(null)}
+        itemName={deleteItem?.fileName || 'file'}
+        onConfirm={() => {
+          if (deleteItem) deleteMutation.mutate(deleteItem, { onSuccess: () => setDeleteId(null) });
         }}
-        itemName="slide"
-        onConfirm={handleDeleteHero}
-        loading={removeHero.isPending}
+        loading={deleteMutation.isPending}
       />
 
       <DeleteConfirmModal
         open={bulkDeleteOpen}
         onOpenChange={setBulkDeleteOpen}
         count={selectedIds.size}
-        itemName="slide"
-        onConfirm={() => bulkRemoveHero.mutate([...selectedIds], {
-          onSuccess: () => {
-            setSelectedIds(new Set());
-            setBulkDeleteOpen(false);
-          }
-        })}
-        loading={bulkRemoveHero.isPending}
+        itemName="file"
+        onConfirm={() => {
+          bulkDeleteMutation.mutate(selectedItems, {
+            onSuccess: () => { setSelectedIds(new Set()); setBulkDeleteOpen(false); },
+          });
+        }}
+        loading={bulkDeleteMutation.isPending}
       />
 
-      <ImagePreviewModal
-        open={!!previewUri}
-        uri={previewUri}
-        name={previewName}
-        type={previewType}
-        onClose={() => setPreviewUri(null)}
-      />
+      <Modal visible={!!previewItem} transparent animationType="fade" onRequestClose={() => setPreviewItem(null)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onPress={() => setPreviewItem(null)}
+        >
+          <View style={{ position: 'absolute', top: 40, left: 0, right: 0, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 }}>
+            <View style={{ flex: 1 }}>
+              {previewItem?.fileName && (
+                <Text numberOfLines={1} style={{ color: 'white', fontSize: 16, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium' }}>
+                  {previewItem.fileName}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 8, marginLeft: 16 }} onPress={() => setPreviewItem(null)}>
+              <X size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          <Pressable 
+            onPress={e => e.stopPropagation?.()} 
+            style={{ 
+              width: '100%',
+              maxWidth: Math.min(1000, windowHeight * 0.75 * (16 / 9)),
+              maxHeight: windowHeight * 0.75,
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: 'black',
+              borderRadius: 8,
+              overflow: 'hidden'
+            }}
+          >
+            {previewItem && isImage(previewItem.fileName) ? (
+              <Image 
+                source={{ uri: `${API_ORIGIN}${previewItem.relativePath}` }} 
+                style={{ width: '100%', height: '100%' }} 
+                resizeMode="contain" 
+              />
+            ) : previewItem && isVideo(previewItem.fileName) ? (
+              <WebView
+                source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"><style>body{margin:0;padding:0;overflow:hidden;background-color:black;display:flex;justify-content:center;align-items:center;height:100vh;width:100vw;}</style></head><body><video src="${API_ORIGIN}${previewItem.relativePath}" style="width:100%;height:100%;max-height:100vh;object-fit:contain" controls autoplay playsinline></video></body></html>` }}
+                style={{ flex: 1, backgroundColor: 'black', width: '100%' }}
+                allowsFullscreenVideo
+                javaScriptEnabled
+                scrollEnabled={false}
+                bounces={false}
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+               <Text style={{ color: 'white' }}>Preview not available for this file type.</Text>
+            )}
+          </Pressable>
+          
+          {previewItem && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20 }}>
+              {previewItem && isImage(previewItem.fileName) ? <ImageIcon size={16} color="rgba(255,255,255,0.5)" /> : <Film size={16} color="rgba(255,255,255,0.5)" />}
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600' }}>{previewItem && isImage(previewItem.fileName) ? 'Image Preview' : 'Video Preview'}</Text>
+            </View>
+          )}
+        </Pressable>
+      </Modal>
     </MasterScreenLayout>
   );
 }

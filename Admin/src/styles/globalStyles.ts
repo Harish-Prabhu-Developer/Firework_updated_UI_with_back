@@ -1,3 +1,4 @@
+// Admin/src/styles/globalStyles.ts
 import { StyleSheet, Platform } from "react-native";
 import { LightColors } from "./colors";
 

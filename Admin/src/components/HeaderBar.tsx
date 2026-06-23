@@ -6,6 +6,7 @@ import { Fonts, Radius } from '../styles/globalStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfileModal } from './modals/UserProfileModal';
+import { useNotification } from '../contexts/NotificationContext';
 
 interface HeaderBarProps {
   title: string;
@@ -17,6 +18,7 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
   const insets = useSafeAreaInsets();
   const [userName, setUserName] = useState('Admin User');
   const [profileOpen, setProfileOpen] = useState(false);
+  const { unreadCount } = useNotification();
 
   useEffect(() => {
     AsyncStorage.getItem('user').then(raw => {
@@ -42,7 +44,11 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
       <View style={styles.right}>
         <Pressable style={styles.iconButton}>
           <Bell size={20} color={colors.foreground} />
-          <View style={styles.badge} />
+          {unreadCount > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            </View>
+          )}
         </Pressable>
 
         <Pressable style={styles.userProfile} onPress={() => setProfileOpen(true)}>
@@ -107,16 +113,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.02)',
   },
-  badge: {
+  badgeContainer: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 6,
+    right: 6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.destructive,
     borderWidth: 1.5,
     borderColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 8,
+    fontWeight: 'bold',
+    fontFamily: Fonts.body,
   },
   userProfile: {
     flexDirection: 'row',

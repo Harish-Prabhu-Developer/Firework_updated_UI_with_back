@@ -1,3 +1,4 @@
+// server/src/routes/invoiceRoutes.ts
 import { Router, type Router as ExpressRouter } from 'express';
 import {
     createInvoice,
@@ -14,10 +15,10 @@ import { checkPermission } from '../middleware/permission.js';
 
 const router: ExpressRouter = Router();
 
-// Public route for PDF generation (uses encrypted token, handles slashes in Base64)
-// Public route for PDF generation (uses encrypted token, handles all characters in Base64)
+// Public — PDF served via encrypted token (no auth required)
 router.get('/pdf/*', getInvoicePDF);
 
+// All routes below require authentication
 router.use(authenticate);
 
 router.post('/', checkPermission('invoices', 'create'), createInvoice);
@@ -25,7 +26,6 @@ router.get('/', checkPermission('invoices', 'read'), getAllInvoices);
 router.get('/:id/token', checkPermission('invoices', 'read'), getInvoiceToken);
 router.get('/:id', checkPermission('invoices', 'read'), getInvoiceById);
 router.put('/:id', checkPermission('invoices', 'update'), updateInvoice);
-
 router.delete('/:id', checkPermission('invoices', 'delete'), deleteInvoice);
 router.post('/bulk-delete', checkPermission('invoices', 'bulkDelete'), bulkDeleteInvoices);
 

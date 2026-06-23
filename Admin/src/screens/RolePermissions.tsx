@@ -6,8 +6,9 @@ import { useRoleQueries } from './Roles';
 import { LightColors as colors } from '../styles/colors';
 import { Radius, Fonts } from '../styles/globalStyles';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
+import { ScreenGuard } from '../hooks/usePermissions';
 
-export const Permissions = () => {
+const PermissionsInner = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const roleId = route.params?.roleId;
@@ -127,5 +128,11 @@ export const Permissions = () => {
     </MasterScreenLayout>
   );
 };
+
+const Permissions = () => (
+  <ScreenGuard module="Permissions" action="Update">
+    <PermissionsInner />
+  </ScreenGuard>
+);
 
 export default Permissions;

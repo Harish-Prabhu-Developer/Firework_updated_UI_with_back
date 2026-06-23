@@ -1,3 +1,4 @@
+// server/src/templates/orderTemplate.ts
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +59,15 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
         year: 'numeric',
     });
 
+    const TAX_RATE = 0.18;
+    const numericSubTotal = Number.parseFloat(String(subTotal ?? 0)) || 0;
+    const numericDiscountAmount = Number.parseFloat(String(orderData.discountAmount ?? 0)) || 0;
+    const numericPreTaxTotal = Number.parseFloat(String(totalAmount ?? (numericSubTotal - numericDiscountAmount))) || 0;
+    const taxAmount = numericPreTaxTotal * TAX_RATE;
+    const grandTotal = numericPreTaxTotal + taxAmount;
+    
+    const discountPercentage = numericSubTotal > 0 ? Math.round((numericDiscountAmount / numericSubTotal) * 100) : 0;
+
     const itemRows = (items || []).map((item: any, index: number) => `
         <tr>
             <td>${index + 1}</td>
@@ -83,6 +93,19 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Order ${orderNumber}</title>
         <style>
+            /* =====================================================================
+               PAGE LAYOUT — reusable across every PDF template (orders, invoices…)
+               @page margin is re-applied by the print engine on EVERY page, not
+               just the first one. This is what actually controls the empty space
+               at the top/bottom of page 2, 3, etc. Do NOT use body padding for
+               this — body padding only affects the very first and very last page
+               of a multi-page document, leaving the in-between pages edge-to-edge.
+               ===================================================================== */
+            @page {
+                size: A4;
+                margin: 16mm 14mm 18mm 14mm; /* top right bottom left */
+            }
+
             :root {
                 --primary: hsl(43 65% 52%);
                 --festive-gold: hsl(43 75% 52%);
@@ -99,14 +122,50 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
                 print-color-adjust: exact;
             }
 
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+
             body {
                 font-family: 'Inter', sans-serif;
                 color: var(--text-main);
                 line-height: 1.5;
-                margin: 0;
-                padding: 40px;
                 background: white;
             }
+
+            /* =====================================================================
+               PAGE-BREAK CONTROL — this is what stops a product row (or any other
+               block) from being sliced in half at the bottom of a page. Copy this
+               whole block as-is into other templates (InvoiceTemplate3.ts etc.).
+               ===================================================================== */
+            table {
+                page-break-inside: auto;     /* the table itself is allowed to span pages */
+            }
+
+            thead {
+                display: table-header-group; /* column headers reprint on every new page */
+            }
+
+            tfoot {
+                display: table-footer-group;
+            }
+
+            tr {
+                page-break-inside: avoid;    /* a single row is never split across pages */
+                break-inside: avoid;
+            }
+
+            .header,
+            .brand-section,
+            .info-grid,
+            .summary-section,
+            .notes-block,
+            .footer {
+                page-break-inside: avoid;    /* these blocks move to the next page whole */
+                break-inside: avoid;
+            }
+            /* ===================================================================== */
 
             .invoice-container {
                 max-width: 800px;
@@ -344,11 +403,6 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
                 align-items: flex-end;
                 gap: 12px;
             }
-
-            @page {
-                size: A4;
-                margin: 0;
-            }
         </style>
     </head>
     <body>
@@ -407,18 +461,28 @@ export const generateOrderHTML = (orderData: any, qrCodeDataUrl: string, shopInf
             <div class="summary-section">
                 <table class="summary-table">
                     <tr>
-                        <td>Subtotal</td>
+                        <td>Net Total</td>
                         <td class="text-right">${formatCurrency(subTotal)}</td>
                     </tr>
+                    ${numericDiscountAmount > 0 ? `
+                    <tr>
+                        <td style="color: #16a34a; font-weight: 500;">You Save</td>
+                        <td class="text-right" style="color: #16a34a; font-weight: 500;">- ${formatCurrency(numericDiscountAmount)}</td>
+                    </tr>
+                    ` : ''}
+                    <tr>
+                        <td>Tax (18% GST)</td>
+                        <td class="text-right">${formatCurrency(taxAmount)}</td>
+                    </tr>
                     <tr class="total">
-                        <td>ESTIMATED TOTAL</td>
-                        <td class="text-right">${formatCurrency(totalAmount)}</td>
+                        <td>Overall Total</td>
+                        <td class="text-right">${formatCurrency(grandTotal)}</td>
                     </tr>
                 </table>
             </div>
 
             ${notes ? `
-            <div style="margin-top: 40px;">
+            <div class="notes-block" style="margin-top: 40px;">
                 <h3 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Notes:</h3>
                 <p style="font-size: 14px; color: var(--text-main);">${notes}</p>
             </div>

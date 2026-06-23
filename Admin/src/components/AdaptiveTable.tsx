@@ -1,3 +1,4 @@
+// src/components/AdaptiveTable.tsx
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -50,6 +51,13 @@ interface Props<T> {
 
   // Extra toolbar content
   extraToolbarActions?: React.ReactNode;
+
+  /**
+   * Module name (must match `modules.name` in the DB). When provided, the
+   * toolbar auto-hides Add / Bulk Delete / Export / Import buttons based on
+   * the current user's permissions for that module.
+   */
+  module?: string;
 
   // Pagination
   /**
@@ -113,6 +121,7 @@ export const AdaptiveTable = <T extends Record<string, any>>({
   onPaginationRender,
   externalPerPage,
   onExternalPerPageChange,
+  module,
 }: Props<T>) => {
   const { showTable } = useResponsive();
   const isFocused = useIsFocused();
@@ -204,6 +213,7 @@ export const AdaptiveTable = <T extends Record<string, any>>({
         extraActions={extraToolbarActions}
         perPage={toolbarPerPage}
         onPerPageChange={handleToolbarPerPage}
+        module={module}
       />
 
       {/* ── Table or Card ─────────────────────────────────────── */}

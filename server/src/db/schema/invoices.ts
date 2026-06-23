@@ -1,10 +1,13 @@
+// server/src/db/schema/invoices.ts
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   numeric,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
   uuid,
@@ -14,7 +17,17 @@ import { products } from "./category.js";
 import { users } from "./users.js";
 
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "upi", "card"]);
-export const orderStatusEnum = pgEnum("order_status", ["pending", "confirmed", "converted", "cancelled"]);
+export const orderStatusEnum = pgEnum("order_status", [
+  "ESTIMATE_SUBMITTED",
+  "PENDING_VERIFICATION",
+  "REJECTED",
+  "CONFIRMED",
+  "READY_FOR_DISPATCH",
+  "DISPATCHED",
+  "DELIVERED",
+  "converted"
+]);
+export const gstTypeEnum = pgEnum("gst_type", ["INSIDE_TN", "OUTSIDE_TN"]);
 
 /* =========================
    CUSTOMERS
@@ -24,14 +37,15 @@ export const customers = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: varchar("name", { length: 255 }).notNull(),
-    phone: varchar("phone", { length: 20 }).notNull().unique(), // Unique identifier
-    email: varchar("email", { length: 150 }), // Optional
-    address: text("address"), // Optional
+    phone: varchar("phone", { length: 20 }).notNull().unique(),
+    email: varchar("email", { length: 150 }).unique(),
+    address: text("address"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
   },
   (table) => ({
     phoneIdx: index("customer_phone_idx").on(table.phone),
+    emailIdx: index("customer_email_idx").on(table.email),
   })
 );
 
@@ -45,10 +59,10 @@ export const invoices = pgTable(
     invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
 
     // Links
-    userId: uuid("user_id").references(() => users.id), // Created by
+    userId: uuid("user_id").references(() => users.id),
     customerId: uuid("customer_id")
       .notNull()
-      .references(() => customers.id, { onDelete: "restrict" }), // Billing for this customer
+      .references(() => customers.id, { onDelete: "restrict" }),
 
     // Totals
     subTotal: numeric("sub_total", { precision: 12, scale: 2 }).notNull().default("0"),
@@ -56,9 +70,24 @@ export const invoices = pgTable(
     taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
     totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
 
-    // Status
-    paymentMethod: paymentMethodEnum("payment_method").default("cash").notNull(),
+    // GST Breakdown
+    gstEnabled: boolean("gst_enabled").default(false).notNull(),
+    gstType: gstTypeEnum("gst_type").default("INSIDE_TN"),
+    gstPercentage: real("gst_percentage").default(0),
+    taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 }).default("0"),
 
+    // CGST / SGST (Inside TN)
+    cgstPercentage: real("cgst_percentage").default(0),
+    cgstAmount: numeric("cgst_amount", { precision: 12, scale: 2 }).default("0"),
+    sgstPercentage: real("sgst_percentage").default(0),
+    sgstAmount: numeric("sgst_amount", { precision: 12, scale: 2 }).default("0"),
+
+    // IGST (Outside TN)
+    igstPercentage: real("igst_percentage").default(0),
+    igstAmount: numeric("igst_amount", { precision: 12, scale: 2 }).default("0"),
+
+    // Status & Meta
+    paymentMethod: paymentMethodEnum("payment_method").default("cash").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
@@ -66,6 +95,7 @@ export const invoices = pgTable(
   (table) => ({
     invoiceNoIdx: index("invoice_number_idx").on(table.invoiceNumber),
     customerIdx: index("invoice_customer_id_idx").on(table.customerId),
+    createdAtIdx: index("invoice_created_at_idx").on(table.createdAt),
   })
 );
 
@@ -77,11 +107,11 @@ export const invoiceItems = pgTable("invoice_items", {
   invoiceId: uuid("invoice_id")
     .notNull()
     .references(() => invoices.id, { onDelete: "cascade" }),
-  productId: uuid("product_id"), // Decoupled from products table at DB level
+  productId: uuid("product_id"), // Soft-link, not FK (historical snapshot)
 
-  productName: varchar("product_name", { length: 255 }), // Historical snapshot
-  productContent: text("product_content"), // Historical snapshot
-  productImage: text("product_image"), // Historical snapshot
+  productName: varchar("product_name", { length: 255 }),
+  productContent: text("product_content"),
+  productImage: text("product_image"),
 
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
@@ -95,10 +125,10 @@ export const orders = pgTable(
   "orders",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    orderNumber: varchar("order_number", { length: 50 }).notNull().unique(), // ORD-260228-001
+    orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
 
     // Links
-    userId: uuid("user_id").references(() => users.id), // Created by
+    userId: uuid("user_id").references(() => users.id),
     customerId: uuid("customer_id")
       .notNull()
       .references(() => customers.id, { onDelete: "restrict" }),
@@ -110,7 +140,16 @@ export const orders = pgTable(
     totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
 
     // Status
-    status: orderStatusEnum("status").default("pending").notNull(),
+    status: orderStatusEnum("status").default("ESTIMATE_SUBMITTED").notNull(),
+
+    // Workflow Tracking
+    rejectionReason: text("rejection_reason"),
+    transportName: text("transport_name"),
+    lrNumber: text("lr_number"),
+    vehicleNumber: text("vehicle_number"),
+    confirmedAt: timestamp("confirmed_at"),
+    dispatchedAt: timestamp("dispatched_at"),
+    deliveredAt: timestamp("delivered_at"),
     paymentMethod: paymentMethodEnum("payment_method").default("cash").notNull(),
 
     notes: text("notes"),
@@ -131,11 +170,11 @@ export const orderItems = pgTable("order_items", {
   orderId: uuid("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  productId: uuid("product_id"), // Decoupled from products table at DB level
+  productId: uuid("product_id"),
 
-  productName: varchar("product_name", { length: 255 }), // Historical snapshot
-  productContent: text("product_content"), // Historical snapshot
-  productImage: text("product_image"), // Historical snapshot
+  productName: varchar("product_name", { length: 255 }),
+  productContent: text("product_content"),
+  productImage: text("product_image"),
 
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
@@ -143,61 +182,52 @@ export const orderItems = pgTable("order_items", {
 });
 
 /* =========================
+   ORDER STATUS LOGS
+========================= */
+export const orderStatusLogs = pgTable("order_status_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  status: orderStatusEnum("status").notNull(),
+  remarks: text("remarks"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/* =========================
    RELATIONS
 ========================= */
 
-// Customer Relations
 export const customersRelations = relations(customers, ({ many }) => ({
   invoices: many(invoices),
   orders: many(orders),
 }));
 
-// Invoice Relations
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
-  user: one(users, {
-    fields: [invoices.userId],
-    references: [users.id],
-  }),
-  customer: one(customers, {
-    fields: [invoices.customerId],
-    references: [customers.id],
-  }),
+  user: one(users, { fields: [invoices.userId], references: [users.id] }),
+  customer: one(customers, { fields: [invoices.customerId], references: [customers.id] }),
   items: many(invoiceItems),
 }));
 
-// Invoice Item Relations
 export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
-  invoice: one(invoices, {
-    fields: [invoiceItems.invoiceId],
-    references: [invoices.id],
-  }),
-  product: one(products, {
-    fields: [invoiceItems.productId],
-    references: [products.id],
-  }),
+  invoice: one(invoices, { fields: [invoiceItems.invoiceId], references: [invoices.id] }),
+  product: one(products, { fields: [invoiceItems.productId], references: [products.id] }),
 }));
 
-// Order Relations
 export const ordersRelations = relations(orders, ({ many, one }) => ({
-  user: one(users, {
-    fields: [orders.userId],
-    references: [users.id],
-  }),
-  customer: one(customers, {
-    fields: [orders.customerId],
-    references: [customers.id],
-  }),
+  user: one(users, { fields: [orders.userId], references: [users.id] }),
+  customer: one(customers, { fields: [orders.customerId], references: [customers.id] }),
   items: many(orderItems),
+  statusLogs: many(orderStatusLogs),
 }));
 
-// Order Item Relations
+export const orderStatusLogsRelations = relations(orderStatusLogs, ({ one }) => ({
+  order: one(orders, { fields: [orderStatusLogs.orderId], references: [orders.id] }),
+  user: one(users, { fields: [orderStatusLogs.createdBy], references: [users.id] }),
+}));
+
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
-  order: one(orders, {
-    fields: [orderItems.orderId],
-    references: [orders.id],
-  }),
-  product: one(products, {
-    fields: [orderItems.productId],
-    references: [products.id],
-  }),
+  order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+  product: one(products, { fields: [orderItems.productId], references: [products.id] }),
 }));

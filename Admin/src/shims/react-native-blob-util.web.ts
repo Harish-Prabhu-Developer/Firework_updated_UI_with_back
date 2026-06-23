@@ -1,13 +1,14 @@
+// src/shims/react-native-blob-util.web.ts
 const ReactNativeBlobUtil = {
   fs: {
     dirs: {
       DownloadDir: '',
     },
-    writeFile: async () => {},
-    createFile: async () => {},
+    writeFile: async () => { },
+    createFile: async () => { },
   },
   android: {
-    addCompleteDownload: () => {},
+    addCompleteDownload: () => { },
   },
   config: () => ({
     fetch: async () => ({}),

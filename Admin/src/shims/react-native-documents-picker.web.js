@@ -1,3 +1,4 @@
+// src/shims/react-native-documents-picker.web.js
 // Web stub for @react-native-documents/picker
 export const pick = async (options) => {
   return new Promise((resolve, reject) => {

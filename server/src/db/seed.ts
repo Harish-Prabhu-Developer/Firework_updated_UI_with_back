@@ -2,20 +2,44 @@ import { db } from '../config/database.js';
 import { roles, modules, permissionActions, users, rolePermissions } from './schema/users.js';
 import { settings } from './schema/settings.js';
 import bcrypt from 'bcryptjs';
+import { sql } from 'drizzle-orm';
 
 async function seed() {
     console.log('🌱 Seeding database...');
+
+    // Create sequence for auto-generated product codes (CK100, CK101, ...)
+    await db.execute(sql`CREATE SEQUENCE IF NOT EXISTS product_code_seq MINVALUE 100 START 100;`);
+    console.log('✅ Product code sequence created');
+
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION assign_product_code()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF NEW.product_code IS NULL OR NEW.product_code = '' THEN
+          NEW.product_code := 'CK' || nextval('product_code_seq')::text;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS trg_assign_product_code ON products;
+      CREATE TRIGGER trg_assign_product_code
+      BEFORE INSERT ON products
+      FOR EACH ROW
+      EXECUTE FUNCTION assign_product_code();
+    `);
+    console.log('✅ Product code trigger created');
 
     // Create modules
     const moduleList = [
         { name: 'Dashboard', slug: 'dashboard' },
         { name: 'Categories', slug: 'categories' },
         { name: 'Products', slug: 'products' },
-        { name: 'Tags', slug: 'tags' },
-        { name: 'UOM', slug: 'uoms' },
         { name: 'Videos', slug: 'videos' },
         { name: 'Media Library', slug: 'media-library' },
-        { name: 'Banners', slug: 'banners' },
+
         { name: 'Customers', slug: 'customers' },
         { name: 'Orders', slug: 'orders' },
         { name: 'Invoices', slug: 'invoices' },
@@ -77,7 +101,7 @@ async function seed() {
     await db.insert(users).values({
         name: 'Super Admin',
         email: 'admin@crackerskingdom.com',
-        phone: '9999999999',
+        phone: '8438009220',
         password: hashedPassword,
         roleId: adminRole.id,
         isActive: true,
@@ -87,7 +111,7 @@ async function seed() {
 
     // Create default settings
     await db.insert(settings).values({
-        shopName: 'PRABHU CRACKERS',
+        shopName: 'Crackers Kingdom',
         shopPhone: '9944336113',
         shopAddress: 'Main Road, Sivakasi, Tamil Nadu',
         shopGst: '',

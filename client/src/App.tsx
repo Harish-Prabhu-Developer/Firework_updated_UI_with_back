@@ -1,3 +1,4 @@
+import { lazy, Suspense, useState } from "react";
 import { Provider } from "react-redux";
 import { Store } from "./redux/Store";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -7,30 +8,36 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SEO from "@/components/SEO";
-import Index from "./pages/Index";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
-import Safety from "./pages/Safety";
-import Checkout from "./pages/Checkout";
-import NotFound from "./pages/NotFound";
 import ScrollTop from "@/components/ScrollTop";
-
-import { useState } from "react";
 import OpenStatement from "@/components/ui/OpenStatement";
 import QuickEnquiry from "@/components/QuickEnquiry";
 import WhatsAppButton from "./components/WhatsAppButton";
-import Products from "./pages/Products";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+
+const Index = lazy(() => import("./pages/Index"));
+const Products = lazy(() => import("./pages/Products"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Safety = lazy(() => import("./pages/Safety"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <Loader2 size={32} className="animate-spin text-primary" />
+  </div>
+);
 
 const App = () => {
   const [isStatementOpen, setIsStatementOpen] = useState(true);
@@ -40,21 +47,23 @@ const App = () => {
       <HelmetProvider>
         <Provider store={Store}>
           <TooltipProvider>
-            <SEO /> {/* Global Default SEO */}
+            <SEO />
             <Toaster />
             <BrowserRouter>
               <OpenStatement isOpen={isStatementOpen} onOpenChange={setIsStatementOpen} />
               <ScrollTop />
               <Navbar />
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/safety" element={<Safety />} />
-                <Route path="/checkout" element={<Checkout />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/safety" element={<Safety />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
               <Footer />
               <WhatsAppButton />
               <QuickEnquiry />

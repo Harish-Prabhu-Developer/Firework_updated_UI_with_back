@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -31,7 +32,7 @@ import { FormModal } from '../components/modals/FormModal';
 import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
 import { ImagePreviewModal } from '../components/modals/ImagePreviewModal';
 import { useToast } from '../hooks/useToast';
-import { usePermissions } from '../hooks/usePermissions';
+import { usePermissions, PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
 import { API_URL } from '../utils/constants';
 import { exportCSV } from '../utils/exportUtils';
@@ -50,6 +51,7 @@ interface Category {
   slug: string;
   description?: string;
   image?: string;
+  categoryDiscount?: string;
   rank: number;
   isActive: boolean;
   createdAt: string;
@@ -59,12 +61,13 @@ interface FormState {
   name: string;
   slug: string;
   description: string;
+  categoryDiscount: string;
   rank: string;
   isActive: boolean;
   imageUrl: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', slug: '', description: '', rank: '0', isActive: true, imageUrl: '' };
+const EMPTY_FORM: FormState = { name: '', slug: '', description: '', categoryDiscount: '0', rank: '0', isActive: true, imageUrl: '' };
 const API_ORIGIN = API_URL.replace(/\/api\/v\d+\/?$/, '');
 
 const categoryUi = {
@@ -134,6 +137,7 @@ const normalizeCategory = (item: any, index: number): Category => ({
   name: toDisplayString(item?.name, 'Untitled Category'),
   slug: toDisplayString(item?.slug),
   description: toDisplayString(item?.description),
+  categoryDiscount: toDisplayString(item?.categoryDiscount, '0'),
   image: toDisplayString(item?.image),
   rank: Number.isFinite(Number(item?.rank)) ? Number(item.rank) : 0,
   isActive: toBoolean(item?.isActive),
@@ -299,6 +303,19 @@ export default function Category() {
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
   const [imageUploading, setImageUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLoadedBytes, setUploadLoadedBytes] = useState(0);
+  const [uploadTotalBytes, setUploadTotalBytes] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: uploadProgress,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [uploadProgress]);
 
   const { query, save, remove, bulkRemove } = useCategoryQueries();
   const { refetch: refetchCategories } = query;
@@ -338,6 +355,7 @@ export default function Category() {
     payload: {
       ...form,
       rank: Number(form.rank),
+      categoryDiscount: form.categoryDiscount || '0',
       image: form.imageUrl,
       isActive: Boolean(form.isActive)
     }
@@ -379,6 +397,7 @@ export default function Category() {
       name: c.name,
       slug: c.slug,
       description: c.description ?? '',
+      categoryDiscount: c.categoryDiscount ?? '0',
       rank: String(c.rank),
       isActive: c.isActive,
       imageUrl: c.image ?? '',
@@ -406,29 +425,45 @@ export default function Category() {
   };
 
   const uploadCategoryImage = async (file: any) => {
-    const formData = new FormData();
-    formData.append('categoryImage', file as any);
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('categoryImage', file as any);
 
-    const token = await AsyncStorage.getItem('accessToken');
-    const response = await fetch(`${API_URL}/uploads/categoryImage`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      body: formData,
+      AsyncStorage.getItem('accessToken').then(token => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_URL}/uploads/categoryImage`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadLoadedBytes(event.loaded);
+            setUploadTotalBytes(event.total);
+            setUploadProgress(Math.round((event.loaded * 100) / event.total));
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const uploadedPath = getUploadedCategoryPath(result);
+              if (!uploadedPath) return reject(new Error('Upload completed, but no image path was returned.'));
+              setForm(prev => ({ ...prev, imageUrl: uploadedPath }));
+              setImageTab('url');
+              toast.success('Category image uploaded');
+              resolve(result);
+            } else {
+              reject(new Error(result?.msg || 'Image upload failed'));
+            }
+          } catch (e) {
+            reject(new Error('Invalid server response'));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network request failed'));
+        xhr.send(formData as any);
+      }).catch(reject);
     });
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result?.msg || 'Image upload failed');
-    }
-
-    const uploadedPath = getUploadedCategoryPath(result);
-    if (!uploadedPath) {
-      throw new Error('Upload completed, but no image path was returned.');
-    }
-
-    setForm(prev => ({ ...prev, imageUrl: uploadedPath }));
-    setImageTab('url');
-    toast.success('Category image uploaded');
   };
 
   const handlePickAndUploadImage = async () => {
@@ -453,6 +488,7 @@ export default function Category() {
       toast.apiError(error, 'Image upload failed');
     } finally {
       setImageUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -467,18 +503,25 @@ export default function Category() {
     },
     { key: 'name', label: 'Name', width: 200, render: (c) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontWeight: '700', fontFamily: Fonts.body }}>{c.name}</Text> },
     { key: 'slug', label: 'Slug', width: 180, render: (c) => <Text numberOfLines={1} style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: Fonts.body }}>{c.slug}</Text> },
-    { key: 'description', label: 'Description', width: 300, render: (c) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontFamily: Fonts.body }}>{c.description ?? ''}</Text> },
-    { key: 'rank', label: 'Rank', width: 100, render: (c) => <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: Fonts.body }}>{c.rank}</Text> },
+    { key: 'categoryDiscount', label: 'Discount', width: 100, align: 'right', render: (c) => <Text style={{ color: colors.success, fontSize: 14, fontWeight: '800', fontFamily: Fonts.body }}>{c.categoryDiscount && c.categoryDiscount !== '0' ? `${c.categoryDiscount}%` : '-'}</Text> },
+    { key: 'description', label: 'Description', width: 250, render: (c) => <Text numberOfLines={1} style={{ color: colors.foreground, fontSize: 14, fontFamily: Fonts.body }}>{c.description ?? ''}</Text> },
+    { key: 'rank', label: 'Rank', width: 80, render: (c) => <Text style={{ color: colors.foreground, fontSize: 14, fontFamily: Fonts.body }}>{c.rank}</Text> },
     { key: 'createdAt', label: 'Created', width: 120, render: (c) => <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: Fonts.body }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN') : '-'}</Text> },
     { key: 'status', label: 'Status', width: 130, render: (c) => <StatusPill active={c.isActive} /> },
     {
       key: 'actions', label: 'Actions', width: 132, align: 'center', render: (c) => (
         <View className="flex-row items-center justify-center" style={{ gap: 16, width: '100%' }}>
-          <TouchableOpacity onPress={() => nav.navigate('Products', { categoryId: c.id })}>
-            <Eye size={19} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={19} color={colors.foreground} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={18} color={colors.destructive} /></TouchableOpacity>
+          <PermissionGuard module="Categories" action="View">
+            <TouchableOpacity onPress={() => nav.navigate('Products', { categoryId: c.id })}>
+              <Eye size={19} color={colors.primary} />
+            </TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Categories" action="Update">
+            <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={19} color={colors.foreground} /></TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Categories" action="Delete">
+            <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={18} color={colors.destructive} /></TouchableOpacity>
+          </PermissionGuard>
         </View>
       )
     },
@@ -513,18 +556,29 @@ export default function Category() {
       ) : null}
 
       <View className="flex-row items-center justify-between border-t border-border pt-4">
-        <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '400', fontFamily: Fonts.body }}>
-          <Text style={{ fontWeight: '800' }}>Rank:</Text> {c.rank}
-        </Text>
+        <View className="flex-row gap-4">
+          <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '400', fontFamily: Fonts.body }}>
+            <Text style={{ fontWeight: '800' }}>Rank:</Text> {c.rank}
+          </Text>
+          <Text style={{ color: colors.success, fontSize: 14, fontWeight: '400', fontFamily: Fonts.body }}>
+            <Text style={{ fontWeight: '800' }}>Discount:</Text> {c.categoryDiscount && c.categoryDiscount !== '0' ? `${c.categoryDiscount}%` : '-'}
+          </Text>
+        </View>
         <View className="flex-row items-center" style={{ gap: 14 }}>
-          <TouchableOpacity
-            onPress={() => nav.navigate('Products', { categoryId: c.id })}
-            style={{ padding: 6, borderRadius: 8 }}
-          >
-            <Eye size={18} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={18} color={colors.foreground} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={17} color={colors.destructive} /></TouchableOpacity>
+          <PermissionGuard module="Categories" action="View">
+            <TouchableOpacity
+              onPress={() => nav.navigate('Products', { categoryId: c.id })}
+              style={{ padding: 6, borderRadius: 8 }}
+            >
+              <Eye size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Categories" action="Update">
+            <TouchableOpacity onPress={() => openEdit(c)}><Pencil size={18} color={colors.foreground} /></TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Categories" action="Delete">
+            <TouchableOpacity onPress={() => setDeleteId(c.id)}><Trash2 size={17} color={colors.destructive} /></TouchableOpacity>
+          </PermissionGuard>
         </View>
       </View>
     </View>
@@ -534,6 +588,7 @@ export default function Category() {
     <MasterScreenLayout
       title="Categories"
       subtitle="Manage product categories"
+      module="Categories"
       onAddNew={openAdd}
       addNewLabel="Add Category"
 
@@ -563,6 +618,7 @@ export default function Category() {
         onImport={handleImport}
         showImport={true}
         renderCard={renderCard}
+        module="Categories"
       />
 
       <FormModal
@@ -654,27 +710,75 @@ export default function Category() {
 
             {imageTab === 'upload' ? (
               <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={handlePickAndUploadImage}
                 disabled={imageUploading}
-                className="border-2 border-dashed items-center justify-center p-6"
-                style={{ borderRadius: Radius.lg, borderColor: categoryUi.border, backgroundColor: categoryUi.card, minHeight: 168, opacity: imageUploading ? 0.72 : 1 }}
+                // @ts-ignore Web drag and drop events
+                onDragOver={(e: any) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e: any) => { e.preventDefault(); setIsDragging(false); }}
+                onDrop={async (e: any) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (imageUploading) return;
+                  if (!hasPermission('media-library', 'create') && !hasPermission('Media Library', 'Create')) {
+                    toast.warn('You do not have upload permission.');
+                    return;
+                  }
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) {
+                    try {
+                      setImageUploading(true);
+                      await uploadCategoryImage(file);
+                    } catch (err: any) {
+                      toast.apiError(err, 'Image upload failed');
+                    } finally {
+                      setImageUploading(false);
+                      setUploadProgress(0);
+                    }
+                  }
+                }}
+                className="border-2 border-dashed items-center justify-center p-6 overflow-hidden"
+                style={{ 
+                  borderRadius: Radius.lg, 
+                  borderColor: isDragging ? categoryUi.primary : categoryUi.border, 
+                  backgroundColor: isDragging ? categoryUi.primarySoft : categoryUi.card, 
+                  minHeight: 168 
+                }}
               >
-                <CloudUpload size={40} color={categoryUi.primary} style={{ marginBottom: 12 }} strokeWidth={2.25} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: categoryUi.foreground, fontFamily: Fonts.body }}>
-                  {imageUploading ? 'Uploading image...' : 'Click to browse image'}
-                </Text>
-                <Text style={{ fontSize: 12, color: categoryUi.mutedForeground, marginTop: 4, fontFamily: Fonts.body }}>
-                  {imageUploading ? 'Please wait while the file is uploaded' : 'Supports JPG, PNG, GIF, WEBP'}
-                </Text>
-
-                {form.imageUrl ? (
-                  <View style={{ marginTop: 16, alignItems: 'center' }}>
-                    <Image source={{ uri: resolveAssetUri(form.imageUrl) }} style={{ width: 144, height: 144, borderRadius: Radius.md }} resizeMode="cover" />
-                    <TouchableOpacity onPress={() => setForm({ ...form, imageUrl: '' })} style={{ marginTop: 8 }}>
-                      <Text style={{ color: categoryUi.destructive, fontSize: 12, fontWeight: '600', fontFamily: Fonts.body }}>Remove</Text>
-                    </TouchableOpacity>
+                {imageUploading ? (
+                  <View style={{ width: '100%', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: categoryUi.primary, fontFamily: Fonts.body, marginBottom: 12 }}>
+                      Uploading... {uploadProgress}%
+                    </Text>
+                    <View style={{ width: '100%', height: 8, backgroundColor: categoryUi.muted, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                      <Animated.View style={{ height: '100%', backgroundColor: categoryUi.primary, width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} />
+                    </View>
+                    {uploadTotalBytes > 0 && (
+                      <Text style={{ fontSize: 11, color: categoryUi.mutedForeground, fontFamily: Fonts.body }}>
+                        {(uploadLoadedBytes / (1024 * 1024)).toFixed(2)} MB / {(uploadTotalBytes / (1024 * 1024)).toFixed(2)} MB
+                      </Text>
+                    )}
                   </View>
-                ) : null}
+                ) : (
+                  <>
+                    <CloudUpload size={40} color={categoryUi.primary} style={{ marginBottom: 12 }} strokeWidth={2.25} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: categoryUi.foreground, fontFamily: Fonts.body }}>
+                      {isDragging ? 'Drop image here' : 'Click or drag to browse image'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: categoryUi.mutedForeground, marginTop: 4, fontFamily: Fonts.body }}>
+                      Supports JPG, PNG, GIF, WEBP
+                    </Text>
+
+                    {form.imageUrl ? (
+                      <View style={{ marginTop: 16, alignItems: 'center' }}>
+                        <Image source={{ uri: resolveAssetUri(form.imageUrl) }} style={{ width: 144, height: 144, borderRadius: Radius.md }} resizeMode="cover" />
+                        <TouchableOpacity onPress={() => setForm({ ...form, imageUrl: '' })} style={{ marginTop: 8 }}>
+                          <Text style={{ color: categoryUi.destructive, fontSize: 12, fontWeight: '600', fontFamily: Fonts.body }}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                )}
               </TouchableOpacity>
             ) : (
               <View>
@@ -745,6 +849,25 @@ export default function Category() {
               className="p-3"
               style={{ minHeight: 100, borderRadius: Radius.lg, borderWidth: 1, borderColor: categoryUi.border, fontSize: 14, color: categoryUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: categoryUi.card } as any}
             />
+          </View>
+
+          {/* Category Discount */}
+          <View>
+            <Text style={{ color: categoryUi.foreground, fontSize: 13, fontWeight: '700', marginBottom: 6, fontFamily: Fonts.body }}>
+              Category Discount (%)
+            </Text>
+            <TextInput
+              value={form.categoryDiscount}
+              onChangeText={v => setForm({ ...form, categoryDiscount: v })}
+              placeholder="e.g. 10"
+              placeholderTextColor={categoryUi.mutedForeground}
+              keyboardType="numeric"
+              className="px-3"
+              style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: categoryUi.border, fontSize: 14, color: categoryUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: categoryUi.card } as any}
+            />
+            <Text style={{ color: categoryUi.mutedForeground, fontSize: 11, marginTop: 4, fontFamily: Fonts.body }}>
+              Applied to all products in this category (overrides site discount)
+            </Text>
           </View>
 
           {/* Rank & Status Grid */}

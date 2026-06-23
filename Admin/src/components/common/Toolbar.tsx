@@ -1,3 +1,4 @@
+// src/components/common/Toolbar.tsx
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -14,6 +15,7 @@ import { Select } from '../ui/Select';
 import { useResponsive } from '../../hooks/useResponsive';
 import { LightColors as colors } from '../../styles/colors';
 import { Radius, Fonts } from '../../styles/globalStyles';
+import { useActionPermissions } from '../../hooks/usePermissions';
 
 interface FilterOption { label: string; value: string }
 
@@ -42,6 +44,12 @@ interface Props {
   extraActions?: React.ReactNode;
   perPage?: number;
   onPerPageChange?: (n: number) => void;
+  /**
+   * Module name (must match `modules.name` in the DB). When provided, the
+   * toolbar auto-hides Add / Bulk Delete / Export / Import buttons based on
+   * the current user's permissions for that module.
+   */
+  module?: string;
 }
 
 const PER_PAGE_OPTIONS = [
@@ -62,9 +70,17 @@ export const Toolbar = ({
   extraActions,
   perPage,
   onPerPageChange,
+  module,
 }: Props) => {
   const [exportOpen, setExportOpen] = useState(false);
   const { isMobile } = useResponsive();
+
+  // Auto-gate action buttons by module permissions when `module` is given.
+  const { canCreate, canBulkDelete, canExport, canImport } = useActionPermissions(module);
+  const showAddButton = Boolean(onAddNew) && (module ? canCreate : true);
+  const showBulkDeleteButton = Boolean(onBulkDelete) && (module ? canBulkDelete : true);
+  const showExportButton = Boolean(exportColumns) && (module ? canExport : true);
+  const showImportButton = Boolean(showImport && onImport) && (module ? canImport : true);
 
   const handleExport = async (type: 'csv' | 'excel' | 'pdf') => {
     setExportOpen(false);
@@ -140,7 +156,7 @@ export const Toolbar = ({
             />
           </View>
         )}
-        {selectedCount > 0 && onBulkDelete && (
+        {selectedCount > 0 && showBulkDeleteButton && (
           <TouchableOpacity
             onPress={onBulkDelete}
             className="flex-row items-center gap-1.5 bg-red-50 border border-red-200 rounded-xl px-3 h-10"
@@ -150,7 +166,7 @@ export const Toolbar = ({
           </TouchableOpacity>
         )}
 
-        {exportColumns && (
+        {showExportButton && (
           <View className="relative">
             <TouchableOpacity
               onPress={() => setExportOpen(!exportOpen)}
@@ -224,7 +240,7 @@ export const Toolbar = ({
           </View>
         )}
 
-        {showImport && onImport && (
+        {showImportButton && (
           <TouchableOpacity
             onPress={handleImport}
             className="flex-row items-center gap-1.5 bg-white border border-border rounded-xl px-3 h-10"
@@ -236,7 +252,7 @@ export const Toolbar = ({
 
         {extraActions}
 
-        {onAddNew && (
+        {showAddButton && (
           <TouchableOpacity
             onPress={onAddNew}
             className="flex-row items-center gap-1.5 bg-primary rounded-xl px-4 h-10"

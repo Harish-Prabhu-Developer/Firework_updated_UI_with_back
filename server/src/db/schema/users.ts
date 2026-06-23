@@ -1,3 +1,6 @@
+
+// server/src/db/schema/users.ts
+
 import { relations } from "drizzle-orm";
 import {
   pgTable,
@@ -103,6 +106,8 @@ export const userSessions = pgTable("user_sessions", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   refreshToken: varchar("refresh_token", { length: 500 }).notNull().unique(),
+  fcmToken: varchar("fcm_token", { length: 500 }),
+  fcmPlatform: varchar("fcm_platform", { length: 50 }),
   deviceInfo: varchar("device_info", { length: 255 }),
   ipAddress: varchar("ip_address", { length: 50 }),
   expiresAt: timestamp("expires_at").notNull(),

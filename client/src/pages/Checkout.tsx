@@ -34,6 +34,7 @@ interface CartItem {
   content: string;
   qty: number;
   discPrice: number;
+  price: number;
   img: string;
 }
 
@@ -94,6 +95,14 @@ const Checkout = () => {
     fetchSettings();
   }, []);
 
+  const [formData, setFormData] = useState({
+    phone: "",
+    email: "",
+    name: "",
+    address: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const savedEstimate = useMemo(() => {
     return null;
   }, []);
@@ -110,11 +119,15 @@ const Checkout = () => {
 
   const liveTotalQty = checkoutItems.reduce((acc, item) => acc + (item.qty || 0), 0);
   const liveTotalAmount = checkoutItems.reduce((acc, item) => acc + (item.qty || 0) * item.discPrice, 0);
+  const liveOriginalSubTotal = checkoutItems.reduce((acc, item) => acc + (item.qty || 0) * (item.price || item.discPrice), 0);
   const hasLiveCart = checkoutItems.length > 0;
 
   const totalQty = hasLiveCart ? liveTotalQty : routeTotalQty;
   const finalTotalAmount = hasLiveCart ? liveTotalAmount : routeTotalAmount;
-  const finalSubTotal = hasLiveCart ? liveTotalAmount : routeSubTotal;
+  const finalOriginalSubTotal = hasLiveCart ? liveOriginalSubTotal : routeSubTotal;
+
+  const discountAmount = finalOriginalSubTotal - finalTotalAmount;
+  const discountPercentage = finalOriginalSubTotal > 0 ? Math.round((discountAmount / finalOriginalSubTotal) * 100) : 0;
 
   const isBelowMinimum = finalTotalAmount < minOrder;
   const minimumShortfall = Math.max(0, minOrder - finalTotalAmount);
@@ -125,13 +138,6 @@ const Checkout = () => {
   const [placedTimestamp, setPlacedTimestamp] = useState("");
   const [placedOrderNumber, setPlacedOrderNumber] = useState("");
   const lastConfettiFiredAt = useRef(0);
-  const [formData, setFormData] = useState({
-    phone: "",
-    email: "",
-    name: "",
-    address: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (window.confetti) return;
@@ -301,11 +307,12 @@ const Checkout = () => {
             productContent: item.content,
             productImage: item.img,
             quantity: item.qty,
-            unitPrice: item.discPrice,
-            totalPrice: item.qty * item.discPrice,
+            unitPrice: item.price || item.discPrice,
+            totalPrice: item.qty * (item.price || item.discPrice),
           }))
           : fallbackLines,
-        subTotal: finalSubTotal,
+        subTotal: finalOriginalSubTotal,
+        discountAmount: discountAmount,
         totalAmount: finalTotalAmount,
         totalQty,
       };
@@ -541,11 +548,17 @@ const Checkout = () => {
 
                 <div className="p-6 bg-secondary/30 border-t border-border/60 space-y-3">
                   <div className="flex justify-between text-sm text-muted-foreground font-medium">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(finalSubTotal)}</span>
+                    <span>Net Total</span>
+                    <span>{formatCurrency(finalOriginalSubTotal)}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-festive-green font-medium">
+                      <span>You Save</span>
+                      <span>- {formatCurrency(discountAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-black text-foreground border-t border-dashed border-border pt-3">
-                    <span>Total</span>
+                    <span>Overall Total</span>
                     <span className="text-primary">{formatCurrency(finalTotalAmount)}</span>
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">

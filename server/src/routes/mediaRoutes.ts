@@ -1,3 +1,4 @@
+// server/src/routes/mediaRoutes.ts
 import { Router, type IRouter } from 'express';
 import multer from 'multer';
 import path from 'path';

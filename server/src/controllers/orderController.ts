@@ -1,7 +1,8 @@
+// server/src/controllers/orderController.ts
 import { Request, Response } from 'express';
 import { db } from '../db/index.js';
 import { orders, orderItems, orderStatusEnum } from '../db/schema/invoices.js';
-import { products, productStocks } from '../db/schema/category.js';
+import { products } from '../db/schema/category.js';
 import { customers } from '../db/schema/invoices.js';
 import { settings } from '../db/schema/settings.js';
 import { eq, inArray, desc, sql, like } from 'drizzle-orm';
@@ -20,6 +21,8 @@ import {
     queryToOptionalString,
     queryToPositiveInt,
 } from '../utils/request.js';
+import { sendToRole, sendToUser, sendToAllUsers } from '../services/notificationService.js';
+import { orderStatusLogs } from '../db/schema/invoices.js';
 
 type OrderItemSnapshot = {
     productId: string;
@@ -33,7 +36,7 @@ type OrderItemSnapshot = {
 
 export const createOrder = async (req: Request, res: Response) => {
     try {
-        const { customerData, items, notes, paymentMethod, subTotal, totalAmount } = req.body;
+        const { customerData, items, notes, paymentMethod, subTotal, discountAmount, totalAmount } = req.body;
 
         if (!customerData || !customerData.phone) {
             return res.status(400).json({ success: false, message: "Customer phone is required" });
@@ -75,11 +78,24 @@ export const createOrder = async (req: Request, res: Response) => {
             userId: req.user?.id || null, // Assuming userId might be available from auth middleware
             customerId: customer.id,
             subTotal: String(subTotal || 0),
+            discountAmount: String(discountAmount || 0),
             totalAmount: String(totalAmount || 0),
             paymentMethod: paymentMethod || "cash",
             notes: notes || null,
-            status: 'pending' // Adding default status
+            status: 'ESTIMATE_SUBMITTED' // Default status
         }).returning();
+
+        // Notify all users in the system
+        sendToAllUsers({
+            title: 'New Estimate Request',
+            message: `New estimate request received. Order #${orderNumber}`,
+            type: 'ORDER',
+            referenceId: newOrder.id,
+            orderNumber: orderNumber,
+            screen: 'Order',
+            route: `/orders/${newOrder.id}`,
+            status: 'ESTIMATE_SUBMITTED'
+        }).catch(e => console.error("Notification Error:", e));
 
         // 4. Create Order Items
         if (items && Array.isArray(items) && items.length > 0) {
@@ -96,14 +112,13 @@ export const createOrder = async (req: Request, res: Response) => {
 
             await db.insert(orderItems).values(itemsToInsert);
 
-            // Optional: Update stock if needed (original code had this)
             for (const item of items) {
-                await db.update(productStocks)
+                await db.update(products)
                     .set({
-                        quantity: sql`${productStocks.quantity} - ${item.quantity}`,
+                        stock: sql`${products.stock} - ${item.quantity}`,
                         updatedAt: new Date(),
                     })
-                    .where(eq(productStocks.productId, item.productId));
+                    .where(eq(products.id, item.productId));
             }
         }
 
@@ -117,13 +132,12 @@ export const createOrder = async (req: Request, res: Response) => {
                 try {
                     const orderDate = new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
-                    // Parallelize data fetching and QR generation
                     const [fullOrderData, shopSettings, qrCodeDataUrl] = await Promise.all([
                         db.query.orders.findFirst({
                             where: eq(orders.orderNumber, orderNumber),
                             with: {
                                 customer: true,
-                                items: { with: { product: { with: { uom: true } } } },
+                                items: { with: { product: true } },
                             },
                         }),
                         db.select().from(settings).limit(1),
@@ -148,14 +162,17 @@ export const createOrder = async (req: Request, res: Response) => {
                         customerPhone: String(customerData.phone),
                         customerEmail,
                         subtotal: `₹${Number(subTotal || 0).toLocaleString("en-IN")}`,
+                        discountAmount: `₹${Number(discountAmount || 0).toLocaleString("en-IN")}`,
+                        discountPercentage: Number(subTotal) > 0 ? Math.round((Number(discountAmount || 0) / Number(subTotal || 1)) * 100) : 0,
                         total: `₹${Number(totalAmount || 0).toLocaleString("en-IN")}`,
                         items: (fullOrderData?.items || []).map((item: any) => ({
                             productName: item.productName || item.product?.name || "Product",
-                            content: item.productContent || (item.product?.uom?.code ? `1${item.product.uom.code}` : ""),
+                            content: item.productContent || (item.product?.unit ? `1${item.product.unit}` : ""),
                             quantity: Number(item.quantity || 0),
                             unitPrice: Number(item.unitPrice || 0),
                             totalPrice: Number(item.totalPrice || 0),
                         })),
+                        logoUrl: `${process.env.BASE_URL || `https://${req.get('host')}`}/assets/logo.png`
                     };
 
                     await sendOrderReceivedEmail(customerEmail, emailData, [
@@ -190,7 +207,8 @@ export const getAllOrders = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, msg: 'Invalid order status' });
         }
 
-        const whereCondition = status 
+
+        const whereCondition = status
             ? eq(orders.status, status as typeof orderStatusEnum.enumValues[number])
             : undefined;
 
@@ -210,7 +228,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
         const totalResult = await db.select({ count: sql<number>`count(*)` })
             .from(orders)
             .where(whereCondition);
-            
+
         const totalCount = Number(totalResult[0]?.count || 0);
 
         res.json({
@@ -271,7 +289,7 @@ export const getOrderToken = async (req: Request, res: Response) => {
 export const getOrderPDF = async (req: Request, res: Response) => {
     try {
         const encryptedId = paramToString(req.params[0] || req.params.encryptedId);
-        
+
         if (!encryptedId) return res.status(400).json({ success: false, msg: 'Encrypted order ID required' });
 
         console.log('[OrderPDF] Attempting to decrypt token:', encryptedId);
@@ -406,6 +424,84 @@ export const bulkDeleteOrders = async (req: Request, res: Response) => {
         const result = await db.delete(orders).where(inArray(orders.id, ids));
 
         res.json({ success: true, msg: `${result.rowCount} orders deleted successfully` });
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+    try {
+        const id = paramToString(req.params.id);
+        const { status, rejectionReason, transportName, lrNumber, vehicleNumber } = req.body;
+        
+        if (!id) return res.status(400).json({ success: false, msg: 'Order ID required' });
+        if (!status) return res.status(400).json({ success: false, msg: 'Status required' });
+
+        const orderResult = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+        const order = orderResult[0];
+        if (!order) return res.status(404).json({ success: false, msg: 'Order not found' });
+
+        const updateData: any = { status };
+        if (status === 'REJECTED') updateData.rejectionReason = rejectionReason;
+        if (status === 'DISPATCHED') {
+            updateData.transportName = transportName;
+            updateData.lrNumber = lrNumber;
+            updateData.vehicleNumber = vehicleNumber;
+            updateData.dispatchedAt = new Date();
+        }
+        if (status === 'CONFIRMED') updateData.confirmedAt = new Date();
+        if (status === 'DELIVERED') updateData.deliveredAt = new Date();
+
+        await db.update(orders).set(updateData).where(eq(orders.id, id));
+
+        await db.insert(orderStatusLogs).values({
+            orderId: id,
+            status,
+            remarks: rejectionReason || transportName || '',
+            createdBy: req.user?.id
+        });
+
+        let title = '';
+        let message = '';
+        if (status === 'PENDING_VERIFICATION') {
+            title = 'Order Waiting Verification';
+            message = `Order #${order.orderNumber} is waiting for customer verification.`;
+        } else if (status === 'CONFIRMED') {
+            title = 'Order Confirmed';
+            message = `Order #${order.orderNumber} has been confirmed.`;
+        } else if (status === 'READY_FOR_DISPATCH') {
+            title = 'Order Ready For Dispatch';
+            message = `Order #${order.orderNumber} has been packed and is ready for dispatch.`;
+        } else if (status === 'DISPATCHED') {
+            title = 'Order Dispatched';
+            message = `Order #${order.orderNumber} has been dispatched. LR: ${lrNumber}, Transport: ${transportName}`;
+        } else if (status === 'DELIVERED') {
+            title = 'Order Delivered';
+            message = `Order #${order.orderNumber} has been delivered successfully.`;
+        } else if (status === 'REJECTED') {
+            title = 'Order Rejected';
+            message = `Order #${order.orderNumber} has been rejected. Reason: ${rejectionReason}`;
+        }
+
+        if (title) {
+            const payload = {
+                title,
+                message,
+                type: 'ORDER',
+                referenceId: order.id,
+                orderNumber: order.orderNumber,
+                status,
+                rejectionReason: rejectionReason || ''
+            };
+            if (order.userId) {
+                sendToUser(order.userId, payload).catch(e => console.error(e));
+            }
+            if (status === 'PENDING_VERIFICATION') {
+                sendToRole('Admin', payload).catch(e => console.error(e));
+            }
+        }
+
+        res.json({ success: true, msg: 'Order status updated' });
     } catch (error: any) {
         res.status(500).json({ success: false, msg: error.message });
     }

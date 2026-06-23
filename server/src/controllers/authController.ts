@@ -7,7 +7,7 @@ import { generateAccessToken, generateRefreshToken, TokenPayload } from '../util
 
 export const login = async (req: Request, res: Response) => {
     try {
-        const { identifier, password } = req.body;
+        const { identifier, password, fcmToken, fcmPlatform } = req.body;
 
         if (!identifier || !password) {
             return res.status(400).json({ success: false, msg: 'Identifier and password required' });
@@ -64,6 +64,8 @@ export const login = async (req: Request, res: Response) => {
         await db.insert(userSessions).values({
             userId: user.id,
             refreshToken,
+            fcmToken: fcmToken || null,
+            fcmPlatform: fcmPlatform || null,
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
 
@@ -117,6 +119,44 @@ export const logout = async (req: Request, res: Response) => {
             await db.delete(userSessions).where(eq(userSessions.refreshToken, refreshToken));
         }
         res.json({ success: true, msg: 'Logged out successfully' });
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
+export const updateFcmToken = async (req: Request, res: Response) => {
+    try {
+        const { refreshToken, fcmToken, fcmPlatform } = req.body;
+        
+        if (!fcmToken) {
+            return res.status(400).json({ success: false, msg: 'FCM token required' });
+        }
+
+        if (refreshToken) {
+            // Update by refreshToken (original behaviour)
+            await db.update(userSessions)
+                .set({ fcmToken: fcmToken || null, fcmPlatform: fcmPlatform || null })
+                .where(eq(userSessions.refreshToken, refreshToken));
+        } else if (req.user?.id) {
+            // Fallback: find the most recent session for this user and update it
+            const sessions = await db.select()
+                .from(userSessions)
+                .where(eq(userSessions.userId, req.user.id))
+                .orderBy(userSessions.createdAt)
+                .limit(1);
+
+            if (sessions.length > 0) {
+                await db.update(userSessions)
+                    .set({ fcmToken, fcmPlatform: fcmPlatform || null })
+                    .where(eq(userSessions.id, sessions[0].id));
+            } else {
+                return res.status(404).json({ success: false, msg: 'No active session found' });
+            }
+        } else {
+            return res.status(400).json({ success: false, msg: 'Refresh token or authentication required' });
+        }
+            
+        res.json({ success: true, msg: 'FCM token updated successfully' });
     } catch (error: any) {
         res.status(500).json({ success: false, msg: error.message });
     }

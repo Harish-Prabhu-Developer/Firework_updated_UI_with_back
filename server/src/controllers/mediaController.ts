@@ -1,3 +1,4 @@
+// server/src/controllers/mediaController.ts
 import fs from 'fs/promises';
 import path from 'path';
 import { Request, Response } from 'express';

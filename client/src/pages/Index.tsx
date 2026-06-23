@@ -19,46 +19,15 @@ import {
   Flame,
   Leaf,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ScrollReveal from "@/components/ScrollReveal";
 import HeroCarousel from "@/components/HeroCarousel";
+import VideoSwiper from "@/components/VideoSwiper";
 import SEO from "@/components/SEO";
 import { useShopSettings } from "@/lib/businessInfo";
 import { useQuery } from "@tanstack/react-query";
 import { API_BASE_URL, productService } from "@/services/api";
-import sparklers from "@/assets/sparklers.jpg";
-import flowerPots from "@/assets/flower-pots.jpg";
 import chakkars from "@/assets/chakkars.jpg";
-import rockets from "@/assets/rockets.jpg";
-import repeatingShots from "@/assets/repeating-shots.jpg";
-import bombs from "@/assets/bombs.jpg";
-
-interface Product {
-  name: string;
-  price: string;
-  rating: number;
-  reviews: number;
-  image: string;
-  tag: string;
-  badgeIcon: LucideIcon;
-  badge: string;
-}
-
-const featuredProducts: Product[] = [
-  { name: "Color Sparklers", price: "₹60", rating: 4.8, reviews: 92, image: sparklers, tag: "Sparklers", badgeIcon: Star, badge: "Bestseller" },
-  { name: "Giant Flower Pots", price: "₹120", rating: 4.7, reviews: 74, image: flowerPots, tag: "Flower Pots", badgeIcon: Leaf, badge: "Popular" },
-  { name: "Ground Chakra Deluxe", price: "₹125", rating: 4.6, reviews: 61, image: chakkars, tag: "Chakkars", badgeIcon: Flame, badge: "Hot Pick" },
-];
-
-const categories = [
-  { name: "CHAKKARS", image: chakkars, desc: "Spinning ground wheels" },
-  { name: "FLOWER POTS", image: flowerPots, desc: "Fountain of colors" },
-  { name: "SPARKLERS", image: sparklers, desc: "Classic & colorful" },
-  { name: "ROCKETS", image: rockets, desc: "Aerial sky bursts" },
-  { name: "REPEATING SHOTS", image: repeatingShots, desc: "Multi-shot aerial" },
-  { name: "BOMBS", image: bombs, desc: "Loud & powerful" },
-];
 
 const stats = [
   { icon: Users, value: "500+", label: "HAPPY CUSTOMERS" },
@@ -198,7 +167,7 @@ const Index = () => {
         desc: `${cat.products?.length || 0} Products available`,
         isDynamic: true,
       }))
-    : categories.map(cat => ({ ...cat, isDynamic: false, id: cat.name }));
+    : null;
 
   const displayFeaturedProducts = dbFeaturedProducts && dbFeaturedProducts.length > 0
     ? dbFeaturedProducts.map((p: any) => ({
@@ -211,7 +180,7 @@ const Index = () => {
         badgeIcon: getBadgeIcon(p.badge),
         badge: p.badge,
       }))
-    : featuredProducts;
+    : null;
 
   return (
     <div className="bg-background">
@@ -329,6 +298,9 @@ const Index = () => {
         </div>
       </section>
 
+      {/* ── Video Swiper ── */}
+      <VideoSwiper />
+
       {/* Why Choose Us */}
       <section className="py-20 section-padding bg-secondary/50">
         <div className="container-narrow">
@@ -361,6 +333,7 @@ const Index = () => {
       </section>
 
       {/* ── Categories ── */}
+      {displayCategories && (
       <section className="py-20 section-padding bg-linear-to-b from-background via-secondary/60 to-background">
         <div className="container-narrow">
           <ScrollReveal>
@@ -404,7 +377,9 @@ const Index = () => {
         </div>
       </section>
 
+      )}
       {/* ── Featured Products ── */}
+      {displayFeaturedProducts && (
       <section className="py-20 section-padding bg-linear-to-b from-background via-background to-foreground/5">
         <div className="container-narrow">
           <ScrollReveal className="text-center mb-16 relative">
@@ -472,6 +447,7 @@ const Index = () => {
           </ScrollReveal>
         </div>
       </section>
+      )}
 
       {/* ── How It Works ── */}
       <section className="py-20 section-padding text-card bg-linear-to-b from-foreground via-footer to-footer">

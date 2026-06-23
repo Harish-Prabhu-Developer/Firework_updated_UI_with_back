@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/redux/Store";
 import { setQuantity, updateQuantity } from "@/redux/Slice/CartSlice";
 import { Product } from "@/types/product";
@@ -54,6 +54,8 @@ const Products = () => {
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const dispatch = useAppDispatch();
 
@@ -83,6 +85,7 @@ const Products = () => {
   const totals = useMemo(() => {
     let totalItems = 0;
     let totalAmount = 0;
+    let totalMrpAmount = 0;
     const items: Array<Product & { qty: number }> = [];
 
     categories.forEach((cat) =>
@@ -91,27 +94,87 @@ const Products = () => {
         if (qty > 0) {
           totalItems += qty;
           totalAmount += qty * p.discPrice;
+          totalMrpAmount += qty * p.price;
           items.push({ ...p, qty });
         }
       })
     );
-    return { totalItems, totalAmount, items };
+    const totalDiscount = totalMrpAmount - totalAmount;
+    return { totalItems, totalAmount, totalMrpAmount, totalDiscount, items };
   }, [quantities, categories]);
 
   const isBelowMinimumOrder = totals.totalAmount < MIN_ORDER_AMOUNT;
   const shortfallAmount = Math.max(0, MIN_ORDER_AMOUNT - totals.totalAmount);
 
   const filteredCategories = useMemo(() => {
-    return categories
-      .map(category => ({
-        ...category,
-        products: category.products.filter(p =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          (selectedCategory === "All" || category.name === selectedCategory)
-        )
-      }))
-      .filter(category => category.products.length > 0);
-  }, [searchQuery, selectedCategory, categories]);
+    return categories.filter(category => category.products.length > 0);
+  }, [categories]);
+
+  const isCategoryHighlighted = (catName: string) => {
+    return selectedCategory !== "All" && selectedCategory === catName;
+  };
+
+  const isProductHighlighted = (pName: string, catName: string) => {
+    const hasSearch = searchQuery.trim().length > 0;
+    const hasCategory = selectedCategory !== "All";
+
+    if (!hasSearch && !hasCategory) return false;
+
+    const matchesSearch = hasSearch && pName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = hasCategory && catName === selectedCategory;
+
+    if (hasSearch && hasCategory) {
+      return matchesSearch && matchesCategory;
+    }
+    return matchesSearch || matchesCategory;
+  };
+
+  // Autocomplete search logic
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    const results: Product[] = [];
+    for (const cat of categories) {
+      for (const p of cat.products) {
+        if (p.name.toLowerCase().includes(query)) {
+          results.push(p);
+        }
+      }
+    }
+    return results;
+  }, [searchQuery, categories]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    if (searchQuery.trim().length > 0) {
+      setIsSearchOpen(true);
+      searchTimeoutRef.current = setTimeout(() => {
+        setIsSearchOpen(false);
+      }, 4000);
+    } else {
+      setIsSearchOpen(false);
+    }
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery]);
+
+  const handleSelectSearchResult = (product: Product) => {
+    setSearchQuery(product.name);
+    setIsSearchOpen(false);
+    
+    // Slight delay to ensure DOM is updated/highlighted before scrolling
+    setTimeout(() => {
+      const el = document.getElementById(`product-${product.id}`);
+      if (el) {
+        // Offset to account for sticky header
+        const y = el.getBoundingClientRect().top + window.scrollY - 180;
+        window.scrollTo({ top: y, behavior: 'smooth' });
+      }
+    }, 100);
+  };
 
   // Show legal dialog before checkout
   const handleNext = () => {
@@ -157,6 +220,7 @@ const Products = () => {
 
   return (
     <div>
+      <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
       <SEO
         title="Fireworks Price List and Estimate Form"
         description="Browse our Sivakasi fireworks price list, add quantities, and submit your estimate form online. Get a confirmation call within 2 hours."
@@ -171,7 +235,7 @@ const Products = () => {
         bgImage={headerBg}
       />
 
-      <div className="min-h-screen bg-background pb-36 md:pb-40 overflow-x-hidden font-body">
+      <div className="min-h-screen bg-background pb-36 md:pb-40 overflow-x-clip font-body">
 
         {/* -- Banner -- */}
         <div className="container-narrow px-4 mt-8">
@@ -243,47 +307,69 @@ const Products = () => {
           </motion.div>
         ) : (
           <>
-            {/* -- Search + View Switcher -- */}
-            <div className="container-narrow px-4 mt-10 flex flex-col md:flex-row gap-6">
-              <div className="relative group flex-1">
-                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 group-focus-within:text-primary transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search for crackers..."
-                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-border focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none shadow-sm font-bold text-foreground placeholder:text-muted-foreground/50 bg-card"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+            {/* -- Sticky Filter Bar -- */}
+            <div className="sticky top-[82px] md:top-[98px] z-30 bg-background/95 backdrop-blur-md pt-4 pb-4 border-b border-border shadow-sm mb-6 px-4">
+              <div className="container-narrow flex flex-col md:flex-row gap-4">
+                <div className="relative group flex-1">
+                  <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 group-focus-within:text-primary transition-colors" />
+                  <input
+                    type="text"
+                    placeholder="Please enter 1 to more..."
+                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-border focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all outline-none shadow-sm font-bold text-foreground placeholder:text-muted-foreground/50 bg-card"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (searchQuery.trim().length > 0) setIsSearchOpen(true);
+                    }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setIsSearchOpen(false);
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
 
-              <div className="flex gap-2">
-                <div className="bg-card border border-border rounded-2xl p-1 flex shadow-sm">
-                  <button
-                    onClick={() => setViewMode('table')}
-                    className={`p-2.5 rounded-xl transition-all ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-secondary'}`}
-                    title="Table View"
-                  >
-                    <TableIcon size={20} />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('card')}
-                    className={`p-2.5 rounded-xl transition-all ${viewMode === 'card' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-secondary'}`}
-                    title="Card View"
-                  >
-                    <List size={20} />
-                  </button>
+                  {/* Autocomplete Dropdown */}
+                  {isSearchOpen && searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 w-full mt-2 bg-card border border-border rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto overflow-x-hidden">
+                      {searchResults.map((product) => (
+                        <div
+                          key={product.id}
+                          className="px-4 py-3 hover:bg-primary/10 cursor-pointer border-b border-border/50 last:border-0 flex justify-between items-center transition-colors"
+                          onClick={() => handleSelectSearchResult(product)}
+                        >
+                          <span className="font-bold text-sm text-foreground truncate pr-2">{product.name}</span>
+                          <span className="text-xs text-primary font-black shrink-0">{formatCurrency(product.discPrice)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {viewMode === 'table' && (
-                  <div className="relative sm:min-w-[220px] group">
+                <div className="flex gap-2">
+                  <div className="bg-card border border-border rounded-2xl p-1 flex shadow-sm shrink-0">
+                    <button
+                      onClick={() => setViewMode('table')}
+                      className={`p-2.5 rounded-xl transition-all ${viewMode === 'table' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-secondary'}`}
+                      title="Table View"
+                    >
+                      <TableIcon size={20} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('card')}
+                      className={`p-2.5 rounded-xl transition-all ${viewMode === 'card' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-secondary'}`}
+                      title="Card View"
+                    >
+                      <List size={20} />
+                    </button>
+                  </div>
+
+                  <div className="relative flex-1 md:min-w-[220px] group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                       <div className="p-1.5 bg-primary/10 rounded-lg">
                         <ChevronDown className="w-3.5 h-3.5 text-primary" />
@@ -303,8 +389,20 @@ const Products = () => {
                       <ChevronDown className="w-5 h-5 text-muted-foreground" />
                     </div>
                   </div>
-                )}
+                </div>
               </div>
+
+              {/* Category Highlight Chip */}
+              {selectedCategory !== "All" && (
+                <div className="container-narrow mt-4">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-festive-gold/20 border border-festive-gold/50 text-festive-gold rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
+                    <span>{selectedCategory}</span>
+                    <button onClick={() => setSelectedCategory("All")} className="hover:bg-festive-gold/40 p-1 rounded-full transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {shouldShowLoader ? (
@@ -450,7 +548,11 @@ const Products = () => {
                               <motion.tr
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="bg-primary border-b border-primary/80"
+                                className={`border-b transition-colors ${
+                                  isCategoryHighlighted(category.name)
+                                    ? "bg-festive-gold/90 border-festive-gold shadow-[inset_0_4px_10px_rgba(0,0,0,0.1)]"
+                                    : "bg-primary border-primary/80"
+                                }`}
                               >
                                 <td colSpan={8} className="px-2 py-1.5 md:px-4 md:py-2.5 text-card font-black italic tracking-wider text-[9px] md:text-base uppercase">
                                   {category.name}
@@ -460,11 +562,16 @@ const Products = () => {
                               {category.products.map((product, idx) => (
                                 <motion.tr
                                   key={product.id}
+                                  id={`product-${product.id}`}
                                   layout
                                   initial={{ opacity: 0, y: 10 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   exit={{ opacity: 0, scale: 0.95 }}
-                                  className="border-b border-border/30 hover:bg-primary/5 transition-colors"
+                                  className={`border-b transition-colors ${
+                                    isProductHighlighted(product.name, category.name)
+                                      ? "bg-primary/15 border-l-4 border-l-primary border-b-primary/30"
+                                      : "border-border/30 hover:bg-primary/5 border-l-4 border-l-transparent"
+                                  }`}
                                 >
                                   <td className="px-0.5 md:px-4 py-3 md:py-4 text-center font-medium text-muted-foreground text-[8px] md:text-sm">{idx + 1}</td>
                                   <td className="px-0.5 md:px-4 py-3 md:py-4">
@@ -509,46 +616,22 @@ const Products = () => {
               </>
             ) : (
               /* CARD/LIST VIEW */
-              <div className="container-narrow w-full px-4 mt-10 pb-12">
-                <div className="bg-card rounded-3xl shadow-xl border border-border p-5 mb-8 sticky top-24 z-30 transition-shadow duration-300 hover:shadow-2xl">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex flex-col">
-                      <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest pl-1 mb-1">Select Category</h3>
-                      <div className="relative w-full md:w-72 group">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <div className="p-1 px-2 border border-primary/20 bg-primary/5 rounded-lg">
-                            <List className="w-3 h-3 text-primary" />
-                          </div>
-                        </div>
-                        <select
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="w-full appearance-none pl-12 pr-10 py-3 rounded-xl border border-border focus:ring-4 focus:ring-primary/10 focus:border-primary/40 transition-all outline-none shadow-sm font-black text-foreground bg-card cursor-pointer uppercase tracking-widest text-[10px]"
-                        >
-                          <option value="All">All Categories</option>
-                          {categories.map((cat) => (
-                            <option key={cat.name} value={cat.name}>{cat.name}</option>
-                          ))}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-hover:text-primary transition-colors">
-                          <ChevronDown size={18} />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="hidden sm:block text-right">
-                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em] italic">Browsing</p>
-                      <p className="text-xs font-black text-primary uppercase tracking-tighter">{selectedCategory === "All" ? "Every Product" : selectedCategory}</p>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="container-narrow w-full px-4 mt-6 pb-12">
                 <div className="space-y-6">
                   {filteredCategories.length > 0 ? (
                     filteredCategories.map(category => (
                       <div key={category.name} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-                        <div className="bg-primary px-6 py-3">
-                          <h2 className="text-white font-black text-xs md:text-sm uppercase tracking-[0.2em] flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></div>
+                        <div className={`px-6 py-3 transition-colors ${
+                          isCategoryHighlighted(category.name)
+                            ? "bg-festive-gold/90 shadow-[inset_0_4px_10px_rgba(0,0,0,0.1)]"
+                            : "bg-primary"
+                        }`}>
+                          <h2 className={`font-black text-xs md:text-sm uppercase tracking-[0.2em] flex items-center gap-2 ${
+                            isCategoryHighlighted(category.name) ? "text-primary-foreground" : "text-white"
+                          }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                              isCategoryHighlighted(category.name) ? "bg-primary-foreground" : "bg-primary"
+                            }`}></div>
                             {category.name}
                           </h2>
                         </div>
@@ -556,7 +639,11 @@ const Products = () => {
                           {category.products.map(product => {
                             const qty = quantities[product.id] || 0;
                             return (
-                              <div key={product.id} className="p-4 md:p-6 flex items-center gap-4 hover:bg-secondary/30 transition-colors">
+                              <div key={product.id} id={`product-${product.id}`} className={`p-4 md:p-6 flex items-center gap-4 transition-colors ${
+                                isProductHighlighted(product.name, category.name)
+                                  ? "bg-primary/10 border-l-4 border-l-primary"
+                                  : "hover:bg-secondary/30 border-l-4 border-l-transparent"
+                              }`}>
                                 <div
                                   onClick={() => setSelectedImage({ url: getImageUrl(product.img), name: product.name })}
                                   className="w-20 h-20 md:w-28 md:h-28 bg-secondary rounded-2xl overflow-hidden border border-border shrink-0 shadow-inner group cursor-pointer"
@@ -606,10 +693,25 @@ const Products = () => {
               {totals.totalItems > 0 && (
                 <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t border-border z-50 shadow-[0_-10px_30px_rgba(0,0,0,0.12)]">
                   <div className="container-narrow py-4 px-4 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">Order Summary</p>
-                      <p className="text-sm md:text-base font-black text-foreground">{totals.totalItems} items · <span className="text-primary">{formatCurrency(totals.totalAmount)}</span></p>
-                      {isBelowMinimumOrder && <p className="text-[10px] font-black uppercase tracking-[0.18em] text-festive-ruby mt-1">Add {formatCurrency(shortfallAmount)} more to checkout</p>}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">Order Summary ({totals.totalItems} items)</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs md:text-sm">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <span className="font-medium">Net Total:</span>
+                          <span className="line-through">{formatCurrency(totals.totalMrpAmount)}</span>
+                        </div>
+                        {totals.totalDiscount > 0 && (
+                          <div className="flex items-center gap-1 text-festive-green">
+                            <span className="font-bold">You Save:</span>
+                            <span className="font-bold">- {formatCurrency(totals.totalDiscount)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 font-black text-foreground">
+                          <span>Overall Total:</span>
+                          <span className="text-primary">{formatCurrency(totals.totalAmount)}</span>
+                        </div>
+                      </div>
+                      {isBelowMinimumOrder && <p className="text-[10px] font-black uppercase tracking-[0.18em] text-festive-ruby mt-1.5">Add {formatCurrency(shortfallAmount)} more to checkout</p>}
                     </div>
                     <button onClick={handleNext} disabled={isBelowMinimumOrder} className="bg-primary disabled:bg-primary/50 disabled:cursor-not-allowed text-primary-foreground px-5 md:px-7 py-3 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.18em] shadow-xl active:scale-95 transition-all flex items-center gap-2">
                       <Send size={16} />
@@ -648,7 +750,6 @@ const Products = () => {
 };
 
 export default Products;
-
 
 
 

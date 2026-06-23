@@ -1,3 +1,4 @@
+// Admin/src/screens/BillHistory.tsx
 import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { PdfViewer } from '../components/common/PdfViewer';
@@ -11,6 +12,7 @@ import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
 import { useToast } from '../hooks/useToast';
+import { PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
 import { API_URL } from '../utils/constants';
 import { LightColors as colors } from '../styles/colors';
@@ -30,6 +32,14 @@ interface Invoice {
   paymentMethod: 'cash' | 'upi' | 'card';
   notes?: string; createdAt: string;
 }
+
+// Shared truncation style for single-line table cells.
+// minWidth:0 forces the flex child to actually shrink so numberOfLines/ellipsis kicks in.
+const truncStyle = {
+  flexShrink: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+} as any;
 
 // Slice-like hook for Bill operations
 export const useBillQueries = () => {
@@ -82,9 +92,9 @@ export default function BillHistory() {
   const data = useMemo(() => {
     let d = all as Invoice[];
     if (search) {
-      d = d.filter(i => 
-        i.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
-        i.customer?.name?.toLowerCase().includes(search.toLowerCase()) || 
+      d = d.filter(i =>
+        i.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
+        i.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
         i.customer?.phone?.includes(search)
       );
     }
@@ -99,7 +109,7 @@ export default function BillHistory() {
       const { data } = await api.get(`/invoices/${invoice.id}/token`);
       const token = data.data?.token;
       if (token) {
-        const url = `${API_URL}/invoices/pdf/${token}?template=1`;
+        const url = `${API_URL}/invoices/pdf/${token}?template=3`;
         navigation.navigate('PdfViewer', { uri: url, title: `Invoice ${invoice.invoiceNumber}` });
       }
     } catch (e) { toast.apiError(e, 'Failed to generate PDF link'); }
@@ -119,25 +129,58 @@ export default function BillHistory() {
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const columns: Column<Invoice>[] = [
-    { key: 'invoiceNumber', label: 'Invoice #', width: 140, render: (i) => <Text className="font-black text-sm font-mono text-primary" style={{ fontFamily: Fonts.body }}>{i.invoiceNumber}</Text> },
     {
-      key: 'customer', label: 'Customer', width: 220, render: (i) => (
-        <View>
-          <Text className="font-bold text-sm text-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{i.customer?.name || '—'}</Text>
-          <Text className="text-[10px] font-mono text-muted-foreground">{formatIdentityDisplay(i.customer?.phone)}</Text>
-          {i.customer?.email && <Text className="text-[9px] text-muted-foreground/80 italic">{i.customer.email}</Text>}
+      key: 'invoiceNumber',
+      label: 'Invoice #',
+      width: 160, // bumped from 140 — bold mono "INV-260619-0001" needs the room
+      render: (i) => (
+        // FIX: no numberOfLines meant a slightly-too-narrow column made the
+        // number wrap mid-string ("INV-260619-" / "0001"), inflating that row's
+        // height versus every other row. Truncate on one line instead.
+        <Text
+          className="font-black text-sm font-mono text-primary"
+          style={{ fontFamily: Fonts.body, ...truncStyle }}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {i.invoiceNumber}
+        </Text>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      width: 220,
+      render: (i) => (
+        <View style={{ minWidth: 0, overflow: 'hidden' }}>
+          <Text
+            className="font-bold text-sm text-foreground"
+            style={{ fontFamily: Fonts.body, ...truncStyle }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {i.customer?.name || '—'}
+          </Text>
+          <Text className="text-[10px] font-mono text-muted-foreground" numberOfLines={1} ellipsizeMode="tail" style={truncStyle}>
+            {formatIdentityDisplay(i.customer?.phone)}
+          </Text>
+          {i.customer?.email && (
+            <Text className="text-[9px] text-muted-foreground/80 italic" numberOfLines={1} ellipsizeMode="tail" style={truncStyle}>
+              {i.customer.email}
+            </Text>
+          )}
         </View>
       )
     },
     {
       key: 'items', label: 'Items', width: 80, align: 'center', render: (i) => (
-        <View className="bg-muted px-2 py-0.5 rounded-full">
+        <View className="bg-muted px-2 py-0.5 rounded-full" style={{ alignSelf: 'center' }}>
           <Text className="font-black text-[10px] text-muted-foreground">{i.items?.length || 0}</Text>
         </View>
       )
     },
     {
-      key: 'financials', label: 'Financials', width: 160, align: 'right', render: (i) => {
+      key: 'financials', label: 'Financials', width: 170, align: 'right', render: (i) => {
         const sub = parseFloat(i.subTotal) || 0;
         const disc = parseFloat(i.discountAmount || '0');
         const tax = parseFloat(i.taxAmount || '0');
@@ -145,13 +188,20 @@ export default function BillHistory() {
         const taxPct = sub > 0 ? ((tax / sub) * 100).toFixed(0) : '0';
 
         return (
-          <View className="items-end">
-            <Text className="text-[10px] text-muted-foreground">Sub: {formatCurrency(i.subTotal)}</Text>
-            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.body }}>Tot: {formatCurrency(i.totalAmount)}</Text>
-            {(disc > 0 || tax > 0) && (
-              <Text className="text-[9px] text-success font-bold">
-                {disc > 0 ? `Disc: -${formatCurrency(i.discountAmount)} (${discPct}%) ` : ''}
-                {tax > 0 ? `Tax: +${formatCurrency(i.taxAmount)} (${taxPct}%)` : ''}
+          <View className="items-end" style={{ minWidth: 0 }}>
+            <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>Sub: {formatCurrency(i.subTotal)}</Text>
+            <Text className="font-black text-sm text-foreground" style={{ fontFamily: Fonts.body }} numberOfLines={1}>Tot: {formatCurrency(i.totalAmount)}</Text>
+            {/* FIX: was one concatenated string ("Disc: ... Tax: ...") that wrapped
+                mid-phrase, orphaning "Tax: +" on its own line. Discount and tax now
+                render as two separate, independently-truncated lines. */}
+            {disc > 0 && (
+              <Text className="text-[9px] text-success font-bold" numberOfLines={1} ellipsizeMode="tail">
+                {`Disc: -${formatCurrency(i.discountAmount)} (${discPct}%)`}
+              </Text>
+            )}
+            {tax > 0 && (
+              <Text className="text-[9px] text-success font-bold" numberOfLines={1} ellipsizeMode="tail">
+                {`Tax: +${formatCurrency(i.taxAmount)} (${taxPct}%)`}
               </Text>
             )}
           </View>
@@ -163,9 +213,15 @@ export default function BillHistory() {
     {
       key: 'actions', label: 'Actions', width: 140, render: (inv) => (
         <View className="flex-row gap-1">
-          <TouchableOpacity onPress={() => handleViewPDF(inv)} className="w-8 h-8 rounded-lg bg-muted items-center justify-center"><Eye size={14} color={colors.mutedForeground} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDownloadPDF(inv)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Download size={14} color={colors.primary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => setDeleteId(inv.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity>
+          <PermissionGuard module="Invoices" action="View">
+            <TouchableOpacity onPress={() => handleViewPDF(inv)} className="w-8 h-8 rounded-lg bg-muted items-center justify-center"><Eye size={14} color={colors.mutedForeground} /></TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Invoices" action="Export">
+            <TouchableOpacity onPress={() => handleDownloadPDF(inv)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Download size={14} color={colors.primary} /></TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Invoices" action="Delete">
+            <TouchableOpacity onPress={() => setDeleteId(inv.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity>
+          </PermissionGuard>
         </View>
       )
     },
@@ -213,9 +269,15 @@ export default function BillHistory() {
       </View>
 
       <View className="flex-row border-t border-border/40 pt-2">
-        <TouchableOpacity onPress={() => handleViewPDF(inv)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5 border-r border-border/40"><Eye size={13} color={colors.mutedForeground} /><Text className="text-xs font-bold text-muted-foreground" style={{ fontFamily: Fonts.body }}>View</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDownloadPDF(inv)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5 border-r border-border/40"><Download size={13} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Bill</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setDeleteId(inv.id)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Del</Text></TouchableOpacity>
+        <PermissionGuard module="Invoices" action="View">
+          <TouchableOpacity onPress={() => handleViewPDF(inv)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5 border-r border-border/40"><Eye size={13} color={colors.mutedForeground} /><Text className="text-xs font-bold text-muted-foreground" style={{ fontFamily: Fonts.body }}>View</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Invoices" action="Export">
+          <TouchableOpacity onPress={() => handleDownloadPDF(inv)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5 border-r border-border/40"><Download size={13} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Bill</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Invoices" action="Delete">
+          <TouchableOpacity onPress={() => setDeleteId(inv.id)} className="flex-1 py-2 flex-row items-center justify-center gap-1.5"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Del</Text></TouchableOpacity>
+        </PermissionGuard>
       </View>
     </View>
   );
@@ -224,6 +286,7 @@ export default function BillHistory() {
     <MasterScreenLayout
       title="Bill History"
       subtitle="All generated invoices"
+      module="Invoices"
       onAddNew={() => navigation.navigate('CreateBill')}
       addNewLabel="Create Bill"
       bottomContentInset={96}
@@ -237,6 +300,7 @@ export default function BillHistory() {
         exportTitle="Invoices Report" exportFilename="invoices"
         exportColumns={[{ key: 'invoiceNumber', label: 'Invoice #' }, { key: 'paymentMethod', label: 'Payment' }, { key: 'totalAmount', label: 'Total' }, { key: 'createdAt', label: 'Date' }]}
         renderCard={renderCard}
+        module="Invoices"
       />
 
       {/* Invoice Detail */}

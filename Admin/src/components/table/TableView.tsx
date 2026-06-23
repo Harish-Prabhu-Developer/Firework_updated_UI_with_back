@@ -1,3 +1,4 @@
+// src/components/table/TableView.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { ChevronUp, ChevronDown } from 'lucide-react-native';
@@ -43,9 +44,6 @@ export const TableView = <T extends Record<string, any>>({
 
   // Each column gets its explicit width; columns without a width get an equal share
   // of remaining space — but we never let them go below 100 px.
-  const fixedTotal = columns.reduce((acc, col) => acc + (col.width ?? 0), 0);
-  const flexCols = columns.filter(c => !c.width).length;
-
   // Total table width = checkbox col + all column widths (min 120 for flex cols)
   const minColWidth = 120;
   const minTableWidth =
@@ -72,11 +70,11 @@ export const TableView = <T extends Record<string, any>>({
     >
       <View style={{ minWidth: minTableWidth, width: '100%' }}>
         {/* ── Header ─────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 2, borderBottomColor: colors.border, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center', minHeight: 62 }}>
           {onSelectAll && (
             <TouchableOpacity
               onPress={() => onSelectAll(!allSelected)}
-              style={{ width: CHECKBOX_WIDTH, height: 48, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              style={{ width: CHECKBOX_WIDTH, height: 62, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             >
               <View
                 style={{
@@ -101,8 +99,9 @@ export const TableView = <T extends Record<string, any>>({
               style={{
                 width: col.width ?? minColWidth,
                 flexShrink: 0,
+                minHeight: 62,
                 paddingHorizontal: 16,
-                paddingVertical: 14,
+                paddingVertical: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent:
@@ -119,7 +118,7 @@ export const TableView = <T extends Record<string, any>>({
                   fontWeight: '900',
                   color: '#64748b',
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: 0,
                   ...wrapTextStyle,
                   ...webWrapStyle,
                 }}

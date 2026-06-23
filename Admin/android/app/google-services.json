@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "96958305522",
+    "project_id": "crackers-kingdom",
+    "storage_bucket": "crackers-kingdom.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:96958305522:android:832ad9dd7d561fc67c2c6b",
+        "android_client_info": {
+          "package_name": "com.crackerskingdom.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYtGeg3_Fz0XNmaM2b8HWk84MAcPeKj5E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

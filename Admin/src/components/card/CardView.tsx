@@ -1,3 +1,4 @@
+// src/components/card/CardView.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { LightColors as colors } from '../../styles/colors';

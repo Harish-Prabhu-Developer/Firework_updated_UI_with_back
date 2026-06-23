@@ -1,3 +1,4 @@
+// Admin/src/styles/colors.ts
 export const LightColors = {
   background: "hsl(40, 20%, 97%)",
   foreground: "hsl(150, 30%, 12%)",

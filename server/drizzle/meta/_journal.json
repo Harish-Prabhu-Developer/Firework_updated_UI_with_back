@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777802220843,
-      "tag": "0000_old_morph",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1778651154048,
-      "tag": "0001_bent_hairball",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1778761168433,
-      "tag": "0002_eminent_arclight",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1778960886102,
-      "tag": "0003_chunky_drax",
+      "when": 1782228992697,
+      "tag": "0000_tough_dreadnoughts",
       "breakpoints": true
     }
   ]

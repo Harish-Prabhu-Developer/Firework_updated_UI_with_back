@@ -1,3 +1,4 @@
+// Admin/src/navigation/BillStack.tsx
 import React from 'react';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import * as Screens from '../screens';

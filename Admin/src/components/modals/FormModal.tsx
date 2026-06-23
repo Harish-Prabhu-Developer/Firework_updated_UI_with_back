@@ -74,8 +74,11 @@ export const FormModal = ({
               {scrollable ? (
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: modalMaxHeight - (footer ? 156 : 92) }}
+                  showsVerticalScrollIndicator={Platform.OS === 'web'}
+                  style={{
+                    maxHeight: modalMaxHeight - (footer ? 156 : 92),
+                    ...(Platform.OS === 'web' ? { overflowY: 'auto' } as any : {}),
+                  }}
                 >
                   <View style={{ paddingHorizontal: horizontalPadding, paddingVertical: isCompact ? 16 : 20 }}>{children}</View>
                 </ScrollView>

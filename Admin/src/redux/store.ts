@@ -1,6 +1,5 @@
 import { configureStore, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-/* ── Generic UI slice factory ────────────────────── */
 const makeUISlice = (name: string) =>
   createSlice({
     name,
@@ -17,11 +16,8 @@ export const productUISlice = makeUISlice('productUI');
 export const customerUISlice = makeUISlice('customerUI');
 export const orderUISlice = makeUISlice('orderUI');
 export const invoiceUISlice = makeUISlice('invoiceUI');
-export const heroUISlice = makeUISlice('heroUI');
-export const tagUISlice = makeUISlice('tagUI');
 export const userUISlice = makeUISlice('userUI');
 export const roleUISlice = makeUISlice('roleUI');
-export const uomUISlice = makeUISlice('uomUI');
 export const videoUISlice = makeUISlice('videoUI');
 
 export const store = configureStore({
@@ -31,11 +27,8 @@ export const store = configureStore({
     customerUI: customerUISlice.reducer,
     orderUI: orderUISlice.reducer,
     invoiceUI: invoiceUISlice.reducer,
-    heroUI: heroUISlice.reducer,
-    tagUI: tagUISlice.reducer,
     userUI: userUISlice.reducer,
     roleUI: roleUISlice.reducer,
-    uomUI: uomUISlice.reducer,
     videoUI: videoUISlice.reducer,
   },
 });

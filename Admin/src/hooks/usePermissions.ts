@@ -1,3 +1,4 @@
+// src/hooks/usePermissions.ts
 /**
  * usePermissions.ts
  *
@@ -239,6 +240,70 @@ export const PermissionProvider = ({
 ══════════════════════════════════════════════════════════════════════════════ */
 export const usePermissions = (): PermissionContextType =>
   useContext(PermissionContext);
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   useActionPermissions(module)
+   Convenience hook that resolves all 7 standard action flags for a single
+   module. Pass the modules.name string (e.g. "Categories", "Products",
+   "Invoices", "Settings", "Media Library").
+
+   Returns booleans for: View, Create, Update, Delete, Bulk Delete, Export, Import.
+   While permissions are loading, every flag is `false` (deny-by-default).
+   Super Admin always receives `true` for every flag.
+
+   Usage:
+     const { canCreate, canUpdate, canDelete, canBulkDelete, canExport, canImport } =
+       useActionPermissions('Categories');
+══════════════════════════════════════════════════════════════════════════════ */
+export interface ActionPermissions {
+  canView: boolean;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canBulkDelete: boolean;
+  canExport: boolean;
+  canImport: boolean;
+}
+
+const NO_PERMISSIONS: ActionPermissions = {
+  canView: false,
+  canCreate: false,
+  canUpdate: false,
+  canDelete: false,
+  canBulkDelete: false,
+  canExport: false,
+  canImport: false,
+};
+
+export const useActionPermissions = (module?: string): ActionPermissions => {
+  const { hasPermission, initialized, currentRole } = usePermissions();
+
+  // Super Admin bypasses everything
+  if (currentRole.toLowerCase() === 'super admin') {
+    return {
+      canView: true,
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+      canBulkDelete: true,
+      canExport: true,
+      canImport: true,
+    };
+  }
+
+  // No module given, or permissions not yet loaded → deny everything
+  if (!module || !initialized) return NO_PERMISSIONS;
+
+  return {
+    canView: hasPermission(module, 'View'),
+    canCreate: hasPermission(module, 'Create'),
+    canUpdate: hasPermission(module, 'Update'),
+    canDelete: hasPermission(module, 'Delete'),
+    canBulkDelete: hasPermission(module, 'Bulk Delete'),
+    canExport: hasPermission(module, 'Export'),
+    canImport: hasPermission(module, 'Import'),
+  };
+};
 
 /* ══════════════════════════════════════════════════════════════════════════════
    PermissionGuard

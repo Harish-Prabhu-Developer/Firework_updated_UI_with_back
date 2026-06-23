@@ -6,6 +6,7 @@ import {
     getCustomerById,
     deleteCustomer,
     bulkDeleteCustomers,
+    upsertCustomer,
 } from '../controllers/customerController.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
@@ -13,6 +14,7 @@ import { checkPermission } from '../middleware/permission.js';
 const router: ExpressRouter = Router();
 router.use(authenticate);
 
+router.post('/upsert', checkPermission('customers', 'create'), upsertCustomer);
 router.post('/', checkPermission('customers', 'create'), createCustomer);
 router.put('/:id', checkPermission('customers', 'update'), updateCustomer);
 router.get('/', checkPermission('customers', 'read'), getAllCustomers);

@@ -18,6 +18,7 @@ const announcement =
 import { useAppSelector } from "@/redux/Store";
 import { useMemo } from "react";
 import { useShopSettings } from "@/lib/businessInfo";
+import { API_BASE_URL } from "@/services/api";
 
 const Navbar = () => {
   const location = useLocation();
@@ -30,6 +31,13 @@ const Navbar = () => {
     return Object.values(quantities).reduce((sum, q) => sum + q, 0);
   }, [quantities]);
 
+  const downloadPriceList = () => {
+    const a = document.createElement("a");
+    a.href = `${API_BASE_URL}/api/v1/client/price-list`;
+    a.target = "_blank";
+    a.download = "CrackersKingdom_PriceList.pdf";
+    a.click();
+  };
   return (
     <>
       <div className="relative z-40 overflow-hidden border-b border-primary/30 bg-linear-to-r from-primary/95 via-primary to-primary/90 text-primary-foreground">
@@ -89,12 +97,10 @@ const Navbar = () => {
 
           <div className="hidden md:flex items-center">
             <Button
-              asChild
-              className="rounded-full h-12 px-7 font-black text-xs uppercase tracking-[0.12em] shadow-[0_10px_24px_hsl(var(--primary)/0.3)]"
+              onClick={downloadPriceList}
+              className="rounded-full h-12 px-7 font-black text-xs uppercase tracking-[0.12em] shadow-[0_10px_24px_hsl(var(--primary)/0.3)] cursor-pointer"
             >
-              <Link to="/products">
-                Get Price List <ArrowRight size={14} />
-              </Link>
+              Price List <ArrowRight size={14} className="ml-1.5" />
             </Button>
           </div>
 
@@ -164,17 +170,15 @@ const Navbar = () => {
                 </nav>
 
                 <div className="p-4 border-t border-border/60 bg-background/95">
-                  <Button
-                    asChild
-                    className="w-full h-11 rounded-2xl font-black text-xs uppercase tracking-widest"
-                  >
-                    <SheetClose asChild>
-                      <Link to="/products">
-                        <Sparkles size={15} />
-                        Get Price List
-                      </Link>
-                    </SheetClose>
-                  </Button>
+                  <SheetClose asChild>
+                    <Button
+                      onClick={downloadPriceList}
+                      className="w-full h-11 rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer"
+                    >
+                      <Sparkles size={15} className="mr-1.5" />
+                      Price List
+                    </Button>
+                  </SheetClose>
                 </div>
               </div>
             </SheetContent>

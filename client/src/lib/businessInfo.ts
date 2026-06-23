@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getShopSettings } from "@/services/productController";
+import { getShopSettings } from "@/services/api";
 
 // ─── Shape of the API response ───────────────────────────────────────────────
 export interface ShopSettings {

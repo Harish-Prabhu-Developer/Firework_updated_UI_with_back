@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAppDispatch, useAppSelector } from "@/redux/Store";
 import { setCategories, setLoading, setError } from "@/redux/Slice/ProductSlice";
-import { productController } from "@/services/productController";
+import { productController } from "@/services/api";
 import { useEffect } from "react";
 
 /**

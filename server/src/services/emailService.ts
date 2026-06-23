@@ -15,12 +15,15 @@ export interface OrderEmailData {
         unitPrice: number | string;
         totalPrice: number | string;
     }>;
+    logoUrl?: string;
 }
 
 export interface EmailAttachment {
     filename: string;
-    content: Buffer | string;
+    content?: Buffer | string;
+    path?: string;
     contentType?: string;
+    cid?: string;
 }
 
 export const sendOrderReceivedEmail = async (
@@ -34,5 +37,6 @@ export const sendOrderReceivedEmail = async (
     }
 
     const html = OrderReceivedTemplate(data);
+
     return sendEmail(recipient, `Order Received - ${data.orderNumber}`, html, attachments);
 };

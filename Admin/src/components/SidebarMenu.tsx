@@ -1,5 +1,5 @@
 /**
- * SidebarMenu.tsx
+ * /src/components/SidebarMenu.tsx
  *
  * Renders only the menu items the current user has "View" permission for.
  * Dashboard and Settings are always visible (no permission gate).
@@ -22,17 +22,15 @@ import {
   LayoutDashboard,
   Package,
   FolderTree,
-  Tags,
-  Ruler,
   Users,
   Shield,
   Settings,
   LogOut,
   ShoppingCart,
   Receipt,
-  Image,
   Video,
   User,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { Radius, Fonts } from '../styles/globalStyles';
@@ -87,22 +85,10 @@ const MENU_ITEMS: MenuItem[] = [
     module: 'Categories',
   },
   {
-    name: 'UOM',
-    icon: Ruler,
-    route: 'UOM',
-    module: 'UOM',
-  },
-  {
     name: 'Products',
     icon: Package,
     route: 'Products',
     module: 'Products',
-  },
-  {
-    name: 'Tags',
-    icon: Tags,
-    route: 'Tags',
-    module: 'Tags',
   },
   {
     name: 'Roles',
@@ -117,16 +103,16 @@ const MENU_ITEMS: MenuItem[] = [
     module: 'Users',
   },
   {
-    name: 'Media',
-    icon: Image,
-    route: 'Media',
-    module: 'Media Library',    // matches modules.name "Media Library"
-  },
-  {
     name: 'Videos',
     icon: Video,
     route: 'Videos',
     module: 'Videos',
+  },
+  {
+    name: 'Media',
+    icon: ImageIcon,
+    route: 'Media',
+    module: 'Media Library',
   },
   {
     name: 'Settings',
@@ -214,7 +200,8 @@ export const SidebarMenu = (props: any) => {
 
       {/* Menu Items */}
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={Platform.OS === 'web'}
+        {...(Platform.OS === 'web' ? { className: 'custom-scrollbar' } as any : {})}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >

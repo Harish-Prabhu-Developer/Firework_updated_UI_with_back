@@ -25,11 +25,8 @@ const cartSlice = createSlice({
       const current = state.quantities[id] || 0;
       state.quantities[id] = Math.max(0, current + delta);
     },
-    clearCart: (state) => {
-      state.quantities = {};
-    },
   },
 });
 
-export const { setQuantity, updateQuantity, clearCart } = cartSlice.actions;
+export const { setQuantity, updateQuantity } = cartSlice.actions;
 export default cartSlice.reducer;

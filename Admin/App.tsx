@@ -1,3 +1,4 @@
+// App.tsx
 import React, { useEffect, useState } from 'react';
 import { AppState, AppStateStatus, Platform, View, ActivityIndicator, Text } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
@@ -18,6 +19,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ToastProvider } from './src/hooks/useToast';
 import { navigationRef } from './src/navigation/NavigationService';
 import { PaginationPortalProvider } from './src/components/common/PaginationPortal';
+import { NotificationProvider, useNotification } from './src/contexts/NotificationContext';
 import Login from './src/screens/Login';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ShieldCheck } from 'lucide-react-native';
@@ -140,12 +142,9 @@ const linking: LinkingOptions<any> = {
           Orders: 'orders',
           Billing: 'billing',
           Categories: 'categories',
-          UOM: 'uom',
           Products: 'products',
-          Tags: 'tags',
           Roles: 'roles',
           Users: 'users',
-          Media: 'media',
           Videos: 'videos',
           Settings: 'settings',
           PdfViewer: 'pdf-viewer',
@@ -188,6 +187,14 @@ const RootNavigator = () => {
       .finally(() => setChecking(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Request notification permissions after mounting and knowing user is logged in
+  const { requestPermissionAndRegister } = useNotification();
+  useEffect(() => {
+      if (loggedIn) {
+          requestPermissionAndRegister();
+      }
+  }, [loggedIn]);
 
   if (checking) return <SplashScreen />;
 
@@ -238,9 +245,11 @@ const App = () => {
                 usePermissions() is available inside RootNavigator.
               */}
               <PermissionProvider>
-                <NavigationContainer ref={navigationRef} linking={linking}>
-                  <RootNavigator />
-                </NavigationContainer>
+                <NotificationProvider>
+                  <NavigationContainer ref={navigationRef} linking={linking}>
+                    <RootNavigator />
+                  </NavigationContainer>
+                </NotificationProvider>
               </PermissionProvider>
             </QueryClientProvider>
           </ToastProvider>

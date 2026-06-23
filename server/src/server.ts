@@ -1,3 +1,4 @@
+// server/src/server.ts
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -21,8 +22,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// Static files for uploads
+// Static files for uploads & assets
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/assets', express.static(path.join(__dirname, '../src/assets')));
 
 // API Routes
 app.use('/api/v1', apiRoutes);

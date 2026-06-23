@@ -10,6 +10,7 @@ import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
 import { useToast } from '../hooks/useToast';
+import { PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
 import { Input } from '../components/ui/Input';
 import { LightColors as colors } from '../styles/colors';
@@ -168,7 +169,7 @@ export default function Roles() {
     { key: 'description', label: 'Description', width: 240, render: (r) => <Text style={{ fontFamily: Fonts.body }} className="text-sm text-muted-foreground" numberOfLines={2}>{r.description || '-'}</Text> },
     { key: 'createdAt', label: 'Created', width: 120, render: (r) => <Text style={{ fontFamily: Fonts.body }} className="text-xs text-muted-foreground">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-'}</Text> },
     { key: 'isActive', label: 'Status', width: 100, render: (r) => <StatusBadge status={r.isActive ? 'Active' : 'Inactive'} /> },
-    { key: 'actions', label: 'Actions', width: 140, align: 'center', render: (r) => <View className="flex-row gap-2"><TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="w-8 h-8 rounded-lg bg-secondary/10 items-center justify-center"><Lock size={14} color={colors.secondary} /></TouchableOpacity><TouchableOpacity onPress={() => openEdit(r)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(r.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
+    { key: 'actions', label: 'Actions', width: 140, align: 'center', render: (r) => <View className="flex-row gap-2"><PermissionGuard module="Permissions" action="Update"><TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="w-8 h-8 rounded-lg bg-secondary/10 items-center justify-center"><Lock size={14} color={colors.secondary} /></TouchableOpacity></PermissionGuard><PermissionGuard module="Roles" action="Update"><TouchableOpacity onPress={() => openEdit(r)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity></PermissionGuard><PermissionGuard module="Roles" action="Delete"><TouchableOpacity onPress={() => setDeleteId(r.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></PermissionGuard></View> },
 
   ];
 
@@ -182,9 +183,15 @@ export default function Roles() {
         </View>
       </View>
       <View className="flex-row border-t border-border/40 pt-2">
-        <TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Lock size={13} color={colors.secondary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-secondary">Permissions</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => openEdit(r)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-primary">Edit</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setDeleteId(r.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-destructive">Delete</Text></TouchableOpacity>
+        <PermissionGuard module="Permissions" action="Update">
+          <TouchableOpacity onPress={() => navigation.navigate('Permissions', { roleId: r.id, roleName: r.name })} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Lock size={13} color={colors.secondary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-secondary">Permissions</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Roles" action="Update">
+          <TouchableOpacity onPress={() => openEdit(r)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-primary">Edit</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Roles" action="Delete">
+          <TouchableOpacity onPress={() => setDeleteId(r.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text style={{ fontFamily: Fonts.body }} className="text-xs font-bold text-destructive">Delete</Text></TouchableOpacity>
+        </PermissionGuard>
       </View>
     </View>
   );
@@ -193,6 +200,7 @@ export default function Roles() {
     <MasterScreenLayout
       title="Role Management"
       subtitle="Define system roles and access permissions"
+      module="Roles"
       onAddNew={openAdd}
       addNewLabel="Add Role"
       onExport={() => exportCSV(data, columns.filter(c => c.key !== 'actions').map(c => ({ key: c.key, label: c.label })), 'roles')}
@@ -211,6 +219,7 @@ export default function Roles() {
         exportTitle="Roles Report"
         exportFilename="roles"
         renderCard={renderCard}
+        module="Roles"
       />
 
       <FormModal

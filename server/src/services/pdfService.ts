@@ -10,7 +10,8 @@ export const clearPDFCache = () => {
 };
 export const generatePDFFromHTML = async (
     html: string,
-    cacheKey?: string
+    cacheKey?: string,
+    format: 'A4' | 'Letter' = 'A4'
 ): Promise<Buffer> => {
     // 1. Performance Optimization (The Cache Layer)
     if (cacheKey) {
@@ -42,10 +43,10 @@ export const generatePDFFromHTML = async (
         const page = await browser.newPage();
 
         // 3. A4 Precision
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
         const pdfBytes = await page.pdf({
-            format: 'A4',
+            format,
             printBackground: true,
             margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' },
         });

@@ -5,8 +5,10 @@ dotenv.config();
 
 interface EmailAttachment {
     filename: string;
-    content: Buffer | string;
+    content?: Buffer | string;
+    path?: string;
     contentType?: string;
+    cid?: string;
 }
 
 export const transporter = nodemailer.createTransport({

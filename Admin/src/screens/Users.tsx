@@ -12,6 +12,7 @@ import { DeleteConfirmModal } from '../components/modals/DeleteConfirmModal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
 import { useToast } from '../hooks/useToast';
+import { PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -179,7 +180,7 @@ export default function Users() {
     { key: 'role', label: 'Role', width: 150, render: (u) => <View className="flex-row items-center gap-1.5 bg-secondary/10 px-2.5 py-1 rounded-full self-start"><Shield size={11} color={colors.secondary} /><Text className="text-[10px] font-bold text-secondary" style={{ fontFamily: Fonts.body }}>{getRoleName(u)}</Text></View> },
     { key: 'createdAt', label: 'Joined', width: 120, render: (u) => <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN') : '-'}</Text> },
     { key: 'isActive', label: 'Status', width: 100, render: (u) => <StatusBadge status={u.isActive ? 'Active' : 'Inactive'} /> },
-    { key: 'actions', label: 'Actions', width: 120, align: 'center', render: (u) => <View className="flex-row gap-2"><TouchableOpacity onPress={() => openEdit(u)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(u.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
+    { key: 'actions', label: 'Actions', width: 120, align: 'center', render: (u) => <View className="flex-row gap-2"><PermissionGuard module="Users" action="Update"><TouchableOpacity onPress={() => openEdit(u)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity></PermissionGuard><PermissionGuard module="Users" action="Delete"><TouchableOpacity onPress={() => setDeleteId(u.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></PermissionGuard></View> },
   ];
 
   const renderCard = (u: User) => (
@@ -201,14 +202,18 @@ export default function Users() {
         <Text className="text-xs font-bold text-secondary" style={{ fontFamily: Fonts.body }}>{getRoleName(u)}</Text>
       </View>
       <View className="flex-row border-t border-border/40 pt-2">
-        <TouchableOpacity onPress={() => openEdit(u)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Edit</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setDeleteId(u.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
+        <PermissionGuard module="Users" action="Update">
+          <TouchableOpacity onPress={() => openEdit(u)} className="flex-1 py-2 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={13} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Edit</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Users" action="Delete">
+          <TouchableOpacity onPress={() => setDeleteId(u.id)} className="flex-1 py-2 flex-row items-center justify-center gap-2"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
+        </PermissionGuard>
       </View>
     </View>
   );
 
   return (
-    <MasterScreenLayout title="Users" subtitle="Manage system users & access" onAddNew={openAdd} addNewLabel="Add User">
+    <MasterScreenLayout title="Users" subtitle="Manage system users & access" module="Users" onAddNew={openAdd} addNewLabel="Add User">
       <AdaptiveTable
         data={data}
         columns={columns}
@@ -226,6 +231,7 @@ export default function Users() {
         exportTitle="Users Report"
         exportFilename="users"
         renderCard={renderCard}
+        module="Users"
       />
 
       <FormModal

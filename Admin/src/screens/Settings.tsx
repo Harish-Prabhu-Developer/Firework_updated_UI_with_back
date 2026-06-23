@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Switch } f
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MasterScreenLayout } from '../layouts/MasterScreenLayout';
 import { useToast } from '../hooks/useToast';
+import { useActionPermissions } from '../hooks/usePermissions';
 import api from '../api/api';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -27,6 +28,7 @@ interface ShopSettings {
   salesStatus: boolean;
   orderReceiptQrStatus: boolean;
   invoiceQrStatus: boolean;
+  siteDiscount: string;
 }
 
 // Slice-like hook for Settings operations
@@ -49,6 +51,7 @@ export default function Settings() {
   const { query, save } = useSettingsQueries();
   const settings = query.data;
   const isLoading = query.isLoading;
+  const { canUpdate } = useActionPermissions('Settings');
   const [form, setForm] = useState<ShopSettings>({
     shopName: '',
     shopPhone: '',
@@ -60,7 +63,8 @@ export default function Settings() {
     socialMedias: { instagram: '', facebook: '' },
     salesStatus: true,
     orderReceiptQrStatus: true,
-    invoiceQrStatus: true
+    invoiceQrStatus: true,
+    siteDiscount: '0'
   });
 
   useEffect(() => {
@@ -76,13 +80,14 @@ export default function Settings() {
         socialMedias: settings.socialMedias ?? { instagram: '', facebook: '' },
         salesStatus: settings.salesStatus ?? true,
         orderReceiptQrStatus: settings.orderReceiptQrStatus ?? true,
-        invoiceQrStatus: settings.invoiceQrStatus ?? true
+        invoiceQrStatus: settings.invoiceQrStatus ?? true,
+        siteDiscount: settings.siteDiscount ?? '0'
       });
     }
   }, [settings]);
 
   if (isLoading) return (
-    <MasterScreenLayout title="Settings">
+    <MasterScreenLayout title="Settings" module="Settings">
       <View className="flex-1 items-center justify-center py-20">
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
@@ -90,7 +95,7 @@ export default function Settings() {
   );
 
   return (
-    <MasterScreenLayout title="Settings" subtitle="Shop configuration">
+    <MasterScreenLayout title="Settings" subtitle="Shop configuration" module="Settings">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="flex-col lg:flex-row lg:gap-8 lg:items-start">
 
@@ -194,6 +199,13 @@ export default function Settings() {
                   keyboardType="numeric"
                   placeholder="3000"
                 />
+                <Input
+                  label="Site Discount (%)"
+                  value={form.siteDiscount}
+                  onChangeText={v => setForm({ ...form, siteDiscount: v })}
+                  keyboardType="numeric"
+                  placeholder="e.g. 5"
+                />
               </View>
             </Card>
 
@@ -219,17 +231,19 @@ export default function Settings() {
               </View>
             </Card>
 
-            <TouchableOpacity
-              onPress={() => save.mutate(form)}
-              disabled={save.isPending}
-              className="h-12 bg-primary rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-primary/20"
-              style={{ opacity: save.isPending ? 0.7 : 1, borderRadius: Radius.xl }}
-            >
-              <Save size={18} color={colors.primaryForeground} />
-              <Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-primary-foreground">
-                {save.isPending ? 'Saving…' : 'Save Settings'}
-              </Text>
-            </TouchableOpacity>
+            {canUpdate ? (
+              <TouchableOpacity
+                onPress={() => save.mutate(form)}
+                disabled={save.isPending}
+                className="h-12 bg-primary rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                style={{ opacity: save.isPending ? 0.7 : 1, borderRadius: Radius.xl }}
+              >
+                <Save size={18} color={colors.primaryForeground} />
+                <Text style={{ fontFamily: Fonts.body }} className="text-sm font-bold text-primary-foreground">
+                  {save.isPending ? 'Saving…' : 'Save Settings'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
         </View>

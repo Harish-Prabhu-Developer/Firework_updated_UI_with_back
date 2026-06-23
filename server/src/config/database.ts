@@ -5,6 +5,7 @@ import * as categorySchema from '../db/schema/category.js';
 import * as invoicesSchema from '../db/schema/invoices.js';
 import * as usersSchema from '../db/schema/users.js';
 import * as settingsSchema from '../db/schema/settings.js';
+import * as notificationsSchema from '../db/schema/notifications.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ export const db = drizzle(pool, {
     ...invoicesSchema,
     ...usersSchema,
     ...settingsSchema,
+    ...notificationsSchema,
   },
 });
 

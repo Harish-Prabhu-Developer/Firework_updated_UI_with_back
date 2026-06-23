@@ -1,113 +1,127 @@
+// server/src/controllers/invoiceController.ts
 import { Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { invoices, invoiceItems, customers, orders } from '../db/schema/invoices.js';
+import { invoices, invoiceItems, customers } from '../db/schema/invoices.js';
 import { products } from '../db/schema/category.js';
 import { settings } from '../db/schema/settings.js';
 import { eq, inArray, desc, and, or, ilike, sql } from 'drizzle-orm';
-import { generateInvoiceNumber, formatCurrency } from '../utils/helpers.js';
+import { generateInvoiceNumber } from '../utils/helpers.js';
 import { decrypt, encrypt } from '../utils/crypto.js';
 import { generatePDFFromHTML } from '../services/pdfService.js';
-import { generateInvoiceHTML } from '../templates/invoiceTemplate.js';
-import { generateInvoiceHTML2 } from '../templates/invoiceTemplate2.js';
+
+import { renderInvoiceHtml } from '../templates/InvoiceTemplate.js'
 import QRCode from 'qrcode';
-import dotenv from "dotenv"
+import dotenv from "dotenv";
 import {
     bodyToStringArray,
     paramToString,
     queryToPositiveInt,
 } from '../utils/request.js';
+import { numberToWords } from '../utils/helpers.js';
 
 dotenv.config();
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Helper: Generate QR Code
+───────────────────────────────────────────────────────────────────────────── */
+export const generateInvoiceQR = async (data: string): Promise<string> => {
+    try {
+        return await QRCode.toDataURL(data, { margin: 1, width: 250 });
+    } catch (e) {
+        return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   POST /invoices
+   Body: {
+     customerId, paymentMethod,
+     subTotal, discountAmount, taxAmount, totalAmount,
+     gstEnabled, gstType, gstPercentage,
+     taxableAmount, cgstPercentage, cgstAmount,
+     sgstPercentage, sgstAmount, igstPercentage, igstAmount,
+     items: [{ productId, productName, quantity, unitPrice, totalPrice }]
+   }
+───────────────────────────────────────────────────────────────────────────── */
 export const createInvoice = async (req: Request, res: Response) => {
     try {
         const {
-            customerName,
-            customerPhone,
-            customerEmail,
-            customerAddress,
-            items,
+            customerId,
+            paymentMethod,
             subTotal,
             discountAmount,
             taxAmount,
             totalAmount,
-            paymentMethod,
-            userId,
+            // GST breakdown
+            gstEnabled,
+            gstType,
+            gstPercentage,
+            taxableAmount,
+            cgstPercentage,
+            cgstAmount,
+            sgstPercentage,
+            sgstAmount,
+            igstPercentage,
+            igstAmount,
             notes,
-            orderId
+            items,
         } = req.body;
 
-        if (!customerPhone || !items?.length) {
-            return res.status(400).json({ success: false, msg: 'Customer phone and items are required' });
+        if (!customerId) {
+            return res.status(400).json({ success: false, msg: 'customerId is required' });
+        }
+        if (!items?.length) {
+            return res.status(400).json({ success: false, msg: 'At least one item is required' });
         }
 
         const invoice = await db.transaction(async (tx) => {
-            // 1. Customer Resolution
-            let customerId: string;
-            const existingCustomer = await tx.select().from(customers).where(eq(customers.phone, customerPhone)).limit(1);
+            // Verify customer exists
+            const [customer] = await tx.select().from(customers).where(eq(customers.id, customerId)).limit(1);
+            if (!customer) throw new Error('Customer not found');
 
-            if (existingCustomer[0]) {
-                customerId = existingCustomer[0].id;
-                // Update their name/email if provided
-                await tx.update(customers)
-                    .set({
-                        name: customerName || existingCustomer[0].name,
-                        email: customerEmail || existingCustomer[0].email,
-                        address: customerAddress || existingCustomer[0].address,
-                        updatedAt: new Date()
-                    })
-                    .where(eq(customers.id, customerId));
-            } else {
-                const [newCustomer] = await tx.insert(customers).values({
-                    name: customerName || "Walk-in Customer",
-                    phone: customerPhone,
-                    email: customerEmail || null,
-                    address: customerAddress || null,
-                }).returning();
-                customerId = newCustomer.id;
-            }
-
-            // 2. Invoice Entry
+            // Create invoice
             const invoiceNumber = await generateInvoiceNumber();
             const [newInvoice] = await tx.insert(invoices).values({
                 invoiceNumber,
-                userId: userId || (req as any).user?.id,
+                userId: (req as any).user?.id ?? null,
                 customerId,
-                subTotal: subTotal.toString(),
-                discountAmount: (discountAmount || 0).toString(),
-                taxAmount: (taxAmount || 0).toString(),
-                totalAmount: totalAmount.toString(),
-                paymentMethod: paymentMethod || 'cash',
-                notes: notes || null,
+                subTotal: subTotal?.toString() ?? '0',
+                discountAmount: discountAmount?.toString() ?? '0',
+                taxAmount: taxAmount?.toString() ?? '0',
+                totalAmount: totalAmount?.toString() ?? '0',
+                // GST
+                gstEnabled: !!gstEnabled,
+                gstType: gstType ?? 'INSIDE_TN',
+                gstPercentage: parseFloat(gstPercentage) || 0,
+                taxableAmount: taxableAmount?.toString() ?? '0',
+                cgstPercentage: parseFloat(cgstPercentage) || 0,
+                cgstAmount: cgstAmount?.toString() ?? '0',
+                sgstPercentage: parseFloat(sgstPercentage) || 0,
+                sgstAmount: sgstAmount?.toString() ?? '0',
+                igstPercentage: parseFloat(igstPercentage) || 0,
+                igstAmount: igstAmount?.toString() ?? '0',
+                paymentMethod: paymentMethod ?? 'cash',
+                notes: notes ?? null,
             }).returning();
 
-            // 3. Item Snapshots
+            // Insert items with product snapshot
             for (const item of items) {
-                let product = null;
+                let productSnapshot: any = null;
                 if (item.productId) {
-                    product = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
+                    const [p] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
+                    productSnapshot = p;
                 }
-
-                const productName = item.productName || product?.[0]?.name || 'Unknown Product';
-                const unitPrice = item.unitPrice || product?.[0]?.sellingPrice || "0";
-                const totalPrice = (parseFloat(unitPrice) * item.quantity).toString();
 
                 await tx.insert(invoiceItems).values({
                     invoiceId: newInvoice.id,
-                    productId: item.productId || null,
-                    productName,
-                    productContent: item.productContent || product?.[0]?.slug || '',
-                    productImage: item.productImage || product?.[0]?.image || '',
-                    quantity: item.quantity,
-                    unitPrice: unitPrice.toString(),
-                    totalPrice,
+                    productId: item.productId ?? null,
+                    productName: item.productName || productSnapshot?.name || 'Unknown Product',
+                    productContent: productSnapshot?.slug ?? null,
+                    productImage: productSnapshot?.image ?? null,
+                    quantity: Number(item.quantity),
+                    unitPrice: item.unitPrice?.toString() ?? '0',
+                    totalPrice: item.totalPrice?.toString() ?? '0',
                 });
-            }
-
-            // 4. Order Update (if originated from an existing order)
-            if (orderId) {
-                await tx.update(orders)
-                    .set({ status: 'converted', updatedAt: new Date() })
-                    .where(eq(orders.id, orderId));
             }
 
             return newInvoice;
@@ -120,24 +134,27 @@ export const createInvoice = async (req: Request, res: Response) => {
     }
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   GET /invoices
+   Query: page, limit, search, paymentMethod
+───────────────────────────────────────────────────────────────────────────── */
 export const getAllInvoices = async (req: Request, res: Response) => {
     try {
         const page = queryToPositiveInt(req.query.page, 1);
         const limit = queryToPositiveInt(req.query.limit, 50);
         const search = req.query.search as string;
-        const paymentMethod = req.query.paymentMethod as string;
+        const paymentMethodFilter = req.query.paymentMethod as string;
         const offset = (page - 1) * limit;
 
-        // Construct dynamic where clause
-        let searchFilters = [];
+        let searchFilters: any[] = [];
 
         if (search) {
-            // Find customer IDs matching name or phone
             const matchedCustomers = await db.select({ id: customers.id })
                 .from(customers)
                 .where(or(
                     ilike(customers.name, `%${search}%`),
-                    ilike(customers.phone, `%${search}%`)
+                    ilike(customers.phone, `%${search}%`),
+                    ilike(customers.email, `%${search}%`),
                 ));
             const customerIds = matchedCustomers.map(c => c.id);
 
@@ -147,26 +164,20 @@ export const getAllInvoices = async (req: Request, res: Response) => {
             ));
         }
 
-        if (paymentMethod) {
-            searchFilters.push(eq(invoices.paymentMethod, paymentMethod as any));
+        if (paymentMethodFilter) {
+            searchFilters.push(eq(invoices.paymentMethod, paymentMethodFilter as any));
         }
 
         const finalWhere = searchFilters.length > 0 ? and(...searchFilters) : undefined;
 
-        // Fetch paginated invoices with relations
         const data = await db.query.invoices.findMany({
             where: finalWhere,
-            with: {
-                customer: true,
-                user: true,
-                items: true,
-            },
+            with: { customer: true, user: true, items: true },
             orderBy: [desc(invoices.createdAt)],
             limit,
             offset,
         });
 
-        // Get total count for pagination metadata
         const [totalCountResult] = await db.select({ count: sql<number>`count(*)` })
             .from(invoices)
             .where(finalWhere);
@@ -176,12 +187,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
         res.json({
             success: true,
             data,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            }
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
     } catch (error: any) {
         console.error('Get All Invoices Error:', error);
@@ -189,28 +195,19 @@ export const getAllInvoices = async (req: Request, res: Response) => {
     }
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   GET /invoices/:id
+───────────────────────────────────────────────────────────────────────────── */
 export const getInvoiceById = async (req: Request, res: Response) => {
     try {
         const id = paramToString(req.params.id);
         if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
 
-        const invoice = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
-        if (!invoice[0]) return res.status(404).json({ success: false, msg: 'Invoice not found' });
-        const customer = await db.select().from(customers).where(eq(customers.id, invoice[0].customerId)).limit(1);
-        const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoice[0].id));
-        res.json({ success: true, data: { ...invoice[0], customer: customer[0], items } });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
-    }
-};
+        const invoice = await db.query.invoices.findFirst({
+            where: eq(invoices.id, id),
+            with: { customer: true, user: true, items: true },
+        });
 
-export const updateInvoice = async (req: Request, res: Response) => {
-    try {
-        const id = paramToString(req.params.id);
-        const { paymentMethod, notes } = req.body;
-        if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
-
-        const [invoice] = await db.update(invoices).set({ paymentMethod, notes, updatedAt: new Date() }).where(eq(invoices.id, id)).returning();
         if (!invoice) return res.status(404).json({ success: false, msg: 'Invoice not found' });
         res.json({ success: true, data: invoice });
     } catch (error: any) {
@@ -218,82 +215,31 @@ export const updateInvoice = async (req: Request, res: Response) => {
     }
 };
 
-export const getInvoicePDF = async (req: Request, res: Response) => {
+/* ─────────────────────────────────────────────────────────────────────────────
+   PUT /invoices/:id
+   Body: { paymentMethod?, notes? }
+───────────────────────────────────────────────────────────────────────────── */
+export const updateInvoice = async (req: Request, res: Response) => {
     try {
-        const encryptedId = paramToString(req.params[0] || req.params.encryptedId);
-        if (!encryptedId) return res.status(400).json({ success: false, msg: 'Encrypted invoice ID required' });
+        const id = paramToString(req.params.id);
+        const { paymentMethod, notes } = req.body;
+        if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
 
-        // 1. Identity Decoding & Security
-        const invoiceId = decrypt(encryptedId);
-        if (!invoiceId) return res.status(400).json({ success: false, msg: 'Invalid invoice ID' });
+        const [invoice] = await db.update(invoices)
+            .set({ paymentMethod, notes, updatedAt: new Date() })
+            .where(eq(invoices.id, id))
+            .returning();
 
-        // 2. Data Assembly (Relational Query)
-        const invoiceData = await db.query.invoices.findFirst({
-            where: eq(invoices.id, invoiceId),
-            with: {
-                customer: true,
-                items: {
-                    with: {
-                        product: {
-                            with: {
-                                uom: true,
-                                productTags: {
-                                    with: {
-                                        tag: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-            }
-        });
-
-        if (!invoiceData) return res.status(404).json({ success: false, msg: 'Invoice not found' });
-
-        const shopSettings = await db.select().from(settings).limit(1);
-        const shopInfo = shopSettings[0] || {};
-        console.log("ShopInfo : ", shopInfo);
-
-
-        // 3. Verification QR Code
-        // Points to a verification URL for digital validation of physical printouts
-        const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
-        const verificationUrl = `${baseUrl}/api/v1/invoices/pdf/${encryptedId}`;
-
-        // Robust check for boolean status
-        const isQrEnabled = !!shopInfo.invoiceQrStatus;
-
-        const qrCodeDataUrl = isQrEnabled
-            ? await QRCode.toDataURL(verificationUrl, {
-                margin: 1,
-                width: 200,
-                color: {
-                    dark: '#1f2937',
-                    light: '#ffffff'
-                }
-            })
-            : '';
-
-        // 4. Professional PDF Rendering & Caching
-        // Support multiple templates via query parameter
-        const templateId = req.query.template as string;
-        const html = templateId === '2'
-            ? generateInvoiceHTML2(invoiceData, qrCodeDataUrl, shopInfo)
-            : generateInvoiceHTML(invoiceData, qrCodeDataUrl, shopInfo);
-
-        const pdf = await generatePDFFromHTML(html, `invoice_${invoiceData.id}_t${templateId || '1'}`);
-
-        // 5. Final Response (Inline)
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="invoice_${invoiceData.invoiceNumber}.pdf"`);
-        res.send(pdf);
+        if (!invoice) return res.status(404).json({ success: false, msg: 'Invoice not found' });
+        res.json({ success: true, data: invoice });
     } catch (error: any) {
-        console.error('Get Invoice PDF Error:', error);
         res.status(500).json({ success: false, msg: error.message });
     }
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   DELETE /invoices/:id
+───────────────────────────────────────────────────────────────────────────── */
 export const deleteInvoice = async (req: Request, res: Response) => {
     try {
         const id = paramToString(req.params.id);
@@ -308,21 +254,10 @@ export const deleteInvoice = async (req: Request, res: Response) => {
     }
 };
 
-export const getInvoiceToken = async (req: Request, res: Response) => {
-    try {
-        const id = paramToString(req.params.id);
-        if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
-
-        const invoice = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
-        if (!invoice[0]) return res.status(404).json({ success: false, msg: 'Invoice not found' });
-
-        const token = encrypt(id);
-        res.json({ success: true, data: { token } });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
-    }
-};
-
+/* ─────────────────────────────────────────────────────────────────────────────
+   POST /invoices/bulk-delete
+   Body: { ids: string[] }
+───────────────────────────────────────────────────────────────────────────── */
 export const bulkDeleteInvoices = async (req: Request, res: Response) => {
     try {
         const ids = bodyToStringArray(req.body.ids);
@@ -331,6 +266,159 @@ export const bulkDeleteInvoices = async (req: Request, res: Response) => {
         const result = await db.delete(invoices).where(inArray(invoices.id, ids));
         res.json({ success: true, msg: `${result.rowCount} invoices deleted` });
     } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GET /invoices/:id/token  — encrypted token for PDF public URL
+───────────────────────────────────────────────────────────────────────────── */
+export const getInvoiceToken = async (req: Request, res: Response) => {
+    try {
+        const id = paramToString(req.params.id);
+        if (!id) return res.status(400).json({ success: false, msg: 'Invoice ID required' });
+
+        const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+        if (!invoice) return res.status(404).json({ success: false, msg: 'Invoice not found' });
+
+        const token = encrypt(id);
+        res.json({ success: true, data: { token } });
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GET /invoices/pdf/:token  — public PDF endpoint, token-based auth
+───────────────────────────────────────────────────────────────────────────── */
+export const getInvoicePDF = async (req: Request, res: Response) => {
+    try {
+        const encryptedId = paramToString(req.params[0] || req.params.encryptedId);
+        if (!encryptedId) return res.status(400).json({ success: false, msg: 'Token required' });
+
+        const invoiceId = decrypt(encryptedId);
+        if (!invoiceId) return res.status(400).json({ success: false, msg: 'Invalid token' });
+
+        const invoiceData = await db.query.invoices.findFirst({
+            where: eq(invoices.id, invoiceId),
+            with: {
+                customer: true,
+                items: {
+                    with: { product: true },
+                },
+            },
+        });
+
+        if (!invoiceData) return res.status(404).json({ success: false, msg: 'Invoice not found' });
+
+        const shopSettings = await db.select().from(settings).limit(1);
+        const shopInfo = shopSettings[0] || {} as any;
+
+        const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
+        const verificationUrl = `${baseUrl}/api/v1/invoices/pdf/${encryptedId}`;
+        const templateId = req.query.template as string;
+
+        const emptyGif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        let payQrCodeUrl = emptyGif;
+        let verifyQrCodeUrl = emptyGif;
+
+        const isQrEnabled = !!shopInfo.invoiceQrStatus;
+        if (isQrEnabled) {
+            const upiId = process.env.UPI_ID || 'merchant@upi';
+            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopInfo.shopName || 'CRACKERS KINGDOM')}&am=${parseFloat(invoiceData.totalAmount).toFixed(2)}&tn=${encodeURIComponent(`Invoice ${invoiceData.invoiceNumber}`)}&cu=INR`;
+            payQrCodeUrl = await generateInvoiceQR(upiString);
+            verifyQrCodeUrl = await generateInvoiceQR(verificationUrl);
+        }
+
+        const shopMapped = {
+            name: shopInfo.shopName || 'CRACKERS KINGDOM',
+            address: shopInfo.shopAddress || '',
+            phone: shopInfo.shopPhone || '',
+            email: shopInfo.shopEmail || '',
+            gstin: shopInfo.shopGst || '',
+            website: shopInfo.shopWebsite || '',
+        };
+
+        const invoiceMapped = {
+            invoiceNumber: invoiceData.invoiceNumber,
+            invoiceDate: invoiceData.createdAt,
+            customerName: invoiceData.customer?.name || '',
+            customerAddress: invoiceData.customer?.address || '',
+            customerEmail: invoiceData.customer?.email || '',
+            customerPhone: invoiceData.customer?.phone || '',
+            items: invoiceData.items.map((item: any) => ({
+                name: item.productName || item.product?.name || 'Unknown',
+                description: item.productContent || item.product?.slug || '',
+                unit: item.product?.unit || 'Nos',
+                quantity: Number(item.quantity),
+                unitPrice: parseFloat(item.unitPrice),
+                total: parseFloat(item.totalPrice),
+            })),
+            subtotal: parseFloat(invoiceData.subTotal),
+            discountAmount: parseFloat(invoiceData.discountAmount || '0'),
+            taxableAmount: parseFloat(invoiceData.taxableAmount || '0'),
+            gstEnabled: invoiceData.gstEnabled,
+            gstType: invoiceData.gstType,
+            gstPercentage: invoiceData.gstPercentage || 0,
+            cgstPercentage: invoiceData.cgstPercentage || 0,
+            cgstAmount: parseFloat(invoiceData.cgstAmount || '0'),
+            sgstPercentage: invoiceData.sgstPercentage || 0,
+            sgstAmount: parseFloat(invoiceData.sgstAmount || '0'),
+            igstPercentage: invoiceData.igstPercentage || 0,
+            igstAmount: parseFloat(invoiceData.igstAmount || '0'),
+            taxAmount: parseFloat(invoiceData.taxAmount || '0'),
+            grandTotal: parseFloat(invoiceData.totalAmount),
+            paymentMethod: invoiceData.paymentMethod,
+            notes: invoiceData.notes || 'Thank you for your business!',
+            termsAndConditions: 'All items are non-refundable after purchase.',
+            payQrLabel: 'Scan to Pay',
+            verifyQrLabel: 'Scan to Verify',
+        };
+
+        let html = '';
+        const dateObj = new Date(invoiceData.createdAt);
+        const invoiceDateStr = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        html = renderInvoiceHtml({
+            invoiceNumber: invoiceData.invoiceNumber,
+            invoiceDate: invoiceDateStr,
+            company: {
+                name: shopInfo.shopName || 'CRACKERS KINGDOM',
+                addressLines: (shopInfo.shopAddress || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+                phone: shopInfo.shopPhone || '',
+                email: shopInfo.shopEmail || '',
+                gstin: shopInfo.shopGst || ''
+            },
+            billTo: {
+                name: invoiceData.customer?.name || '',
+                addressLines: (invoiceData.customer?.address || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+                phone: invoiceData.customer?.phone || ''
+            },
+            items: invoiceData.items.map((item: any) => ({
+                description: item.productName || item.product?.name || 'Unknown',
+                subDescription: item.productContent || item.product?.slug || '',
+                uom: item.product?.unit || 'Nos',
+                qty: Number(item.quantity),
+                rate: parseFloat(item.unitPrice)
+            })),
+            tax: {
+                cgstPercent: invoiceData.cgstPercentage || 0,
+                sgstPercent: invoiceData.sgstPercentage || 0,
+                igstPercent: invoiceData.igstPercentage || 0
+            },
+            amountInWords: numberToWords(parseFloat(invoiceData.totalAmount)),
+            qr: {
+                paymentQrDataUrl: payQrCodeUrl === emptyGif ? undefined : payQrCodeUrl,
+                invoiceQrDataUrl: verifyQrCodeUrl === emptyGif ? undefined : verifyQrCodeUrl
+            }
+        });
+        const pdf = await generatePDFFromHTML(html, `invoice_${invoiceData.id}`);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="invoice_${invoiceData.invoiceNumber}.pdf"`);
+        res.send(pdf);
+    } catch (error: any) {
+        console.error('Get Invoice PDF Error:', error);
         res.status(500).json({ success: false, msg: error.message });
     }
 };

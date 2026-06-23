@@ -1,1 +1,0 @@
-ALTER TABLE "videos" ADD COLUMN "status" boolean DEFAULT true NOT NULL;

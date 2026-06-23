@@ -22,6 +22,27 @@ export const createCustomer = async (req: Request, res: Response) => {
     }
 };
 
+export const upsertCustomer = async (req: Request, res: Response) => {
+    try {
+        const { name, phone, email, address } = req.body;
+        if (!name || !phone) return res.status(400).json({ success: false, msg: 'Name and phone required' });
+        
+        const existing = await db.select().from(customers).where(eq(customers.phone, phone)).limit(1);
+        if (existing[0]) {
+            const [customer] = await db.update(customers)
+                .set({ name, email, address, updatedAt: new Date() })
+                .where(eq(customers.id, existing[0].id))
+                .returning();
+            return res.json({ success: true, data: customer });
+        } else {
+            const [customer] = await db.insert(customers).values({ name, phone, email, address }).returning();
+            return res.status(201).json({ success: true, data: customer });
+        }
+    } catch (error: any) {
+        res.status(500).json({ success: false, msg: error.message });
+    }
+};
+
 export const updateCustomer = async (req: Request, res: Response) => {
     try {
         const id = paramToString(req.params.id);

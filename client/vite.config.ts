@@ -40,5 +40,40 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      sourcemap: false,
+      cssCodeSplit: true,
+      chunkSizeWarningLimit: 500,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("react") || id.includes("scheduler")) {
+                return "vendor-react";
+              }
+              if (id.includes("framer-motion")) {
+                return "vendor-framer";
+              }
+              if (id.includes("lucide-react")) {
+                return "vendor-icons";
+              }
+              if (id.includes("recharts") || id.includes("d3")) {
+                return "vendor-charts";
+              }
+              if (id.includes("@radix-ui")) {
+                return "vendor-radix";
+              }
+              if (id.includes("@tanstack") || id.includes("axios")) {
+                return "vendor-query";
+              }
+              if (id.includes("redux") || id.includes("@reduxjs")) {
+                return "vendor-state";
+              }
+              return "vendor";
+            }
+          },
+        },
+      },
+    },
   };
 });

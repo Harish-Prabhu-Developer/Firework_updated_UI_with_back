@@ -6,6 +6,7 @@ import {
     getProductById,
     deleteProduct,
     bulkDeleteProducts,
+    bulkImportProducts,
 } from '../controllers/productController.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permission.js';
@@ -19,5 +20,6 @@ router.get('/', checkPermission('products', 'read'), getAllProducts);
 router.get('/:id', checkPermission('products', 'read'), getProductById);
 router.delete('/:id', checkPermission('products', 'delete'), deleteProduct);
 router.post('/bulk-delete', checkPermission('products', 'bulkDelete'), bulkDeleteProducts);
+router.post('/bulk-import', checkPermission('products', 'import'), bulkImportProducts);
 
 export default router;

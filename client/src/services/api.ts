@@ -15,6 +15,8 @@ const apiClient = axios.create({
   },
 });
 
+export default apiClient;
+
 // Product Service
 export const productService = {
   getCategories: async () => {
@@ -31,6 +33,11 @@ export const productService = {
   getProductsByTags: async () => {
     const response = await apiClient.get("/client/products-by-tags");
     return response.data.data;
+  },
+
+  getVideos: async () => {
+    const response = await apiClient.get("/client/videos");
+    return response.data.data;
   }
 };
 
@@ -40,6 +47,33 @@ export const settingsService = {
     const response = await apiClient.get("/settings");
     return response.data;
   }
+};
+
+// Product Controller (legacy interface — used by useProducts hook)
+export const productController = {
+  getProductsByCategory: async () => {
+    const response = await apiClient.get("/client/products");
+    if (response.data.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to fetch products");
+  },
+  getProductsByTags: async () => {
+    const response = await apiClient.get("/client/products-by-tags");
+    if (response.data.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to fetch tagged products");
+  },
+};
+
+// Shop Settings (public — no auth required)
+export const getShopSettings = async () => {
+  const response = await apiClient.get("/settings");
+  if (response.data.success) {
+    return response.data.data;
+  }
+  throw new Error(response.data.message || "Failed to fetch settings");
 };
 
 // Contact Service

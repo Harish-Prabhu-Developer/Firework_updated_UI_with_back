@@ -1,3 +1,4 @@
+// src/layouts/MasterScreenLayout.tsx
 import React, { ReactNode, createContext, useContext, useState, useMemo } from 'react';
 import {
   Platform,
@@ -11,6 +12,7 @@ import { Plus, Download } from 'lucide-react-native';
 import { useResponsive } from '../hooks/useResponsive';
 import { LightColors as colors } from '../styles/colors';
 import { Radius, Fonts } from '../styles/globalStyles';
+import { useActionPermissions } from '../hooks/usePermissions';
 
 const iconColors = {
   primaryForeground: '#faf9f6',
@@ -20,6 +22,12 @@ const iconColors = {
 interface Props {
   title: string;
   subtitle?: string;
+  /**
+   * Module name (must match `modules.name` in the DB, e.g. "Categories",
+   * "Products", "Invoices", "Settings"). When provided, the layout
+   * auto-hides the Add and Export header buttons based on the current
+   * user's "Create" and "Export" permissions for that module.
+   */
   module?: string;
   children: ReactNode;
   extraHeaderContent?: ReactNode;
@@ -38,7 +46,7 @@ interface Props {
 }
 
 export const MasterScreenContext = createContext({
-  setStickyFooter: (node: ReactNode | null) => {},
+  setStickyFooter: (node: ReactNode | null) => { },
 });
 
 export const useMasterScreen = () => useContext(MasterScreenContext);
@@ -55,12 +63,18 @@ export const MasterScreenLayout = ({
   scrollable = true,
   bottomContentInset = 0,
   stickyFooter,
+  module,
 }: Props) => {
   const { width, isMobile, isTablet, isDesktop } = useResponsive();
   const [internalStickyFooter, setInternalStickyFooter] = useState<ReactNode | null>(null);
   const contextValue = useMemo(() => ({ setStickyFooter: setInternalStickyFooter }), []);
-  
+
   const finalStickyFooter = stickyFooter || internalStickyFooter;
+
+  // Auto-gate Add + Export header buttons by module permissions when `module` is given.
+  const { canCreate, canExport } = useActionPermissions(module);
+  const showAddButton = Boolean(onAddNew) && (module ? canCreate : true);
+  const showExportButton = Boolean(onExport) && (module ? canExport : true);
 
   const isNarrow = width < 390;
   const horizontalPadding = isNarrow ? 12 : isMobile ? 16 : isTablet ? 24 : 32;
@@ -92,7 +106,7 @@ export const MasterScreenLayout = ({
           </Text>
         </View>
 
-        {onAddNew ? (
+        {showAddButton ? (
           <TouchableOpacity
             onPress={onAddNew}
             activeOpacity={0.8}
@@ -143,7 +157,7 @@ export const MasterScreenLayout = ({
       ) : null}
 
       {/* Extra Header Content (Filters, Export, etc.) */}
-      {(extraHeaderContent || onExport) && (
+      {(extraHeaderContent || showExportButton) && (
         <View
           style={{
             flexDirection: 'row',
@@ -156,7 +170,7 @@ export const MasterScreenLayout = ({
           }}
         >
           {extraHeaderContent}
-          {onExport && (
+          {showExportButton && (
             <TouchableOpacity
               onPress={onExport}
               activeOpacity={0.7}
@@ -216,39 +230,40 @@ export const MasterScreenLayout = ({
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
         {/* ── Scrollable content ──────────────────────────────── */}
-      {scrollable ? (
-        <ScrollView
-          style={
-            Platform.OS === 'web'
-              ? ({ flex: 1, height: '100%' } as any)
-              : { flex: 1 }
-          }
-          contentContainerStyle={{ minHeight: '100%' }}
-          showsVerticalScrollIndicator={true}
-          keyboardShouldPersistTaps="handled"
-        >
-          {body}
-        </ScrollView>
-      ) : (
-        <View style={{ flex: 1 }}>{body}</View>
-      )}
+        {scrollable ? (
+          <ScrollView
+            style={
+              Platform.OS === 'web'
+                ? ({ flex: 1, height: '100%' } as any)
+                : { flex: 1 }
+            }
+            contentContainerStyle={{ minHeight: '100%' }}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+            {...(Platform.OS === 'web' ? { className: 'content-scrollbar' } as any : {})}
+          >
+            {body}
+          </ScrollView>
+        ) : (
+          <View style={{ flex: 1 }}>{body}</View>
+        )}
 
-      {/* ── Sticky footer (Pagination, etc.) ────────────────────
+        {/* ── Sticky footer (Pagination, etc.) ────────────────────
            Rendered OUTSIDE the ScrollView so it never scrolls away.
            Works on Android, iOS and Web.
       ─────────────────────────────────────────────────────────── */}
-      {finalStickyFooter ? (
-        <View
-          style={{
-            width: '100%',
-            // Keep it above any bottom nav bar on Android
-            ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
-          }}
-        >
-          {finalStickyFooter}
-        </View>
-      ) : null}
-    </View>
+        {finalStickyFooter ? (
+          <View
+            style={{
+              width: '100%',
+              // Keep it above any bottom nav bar on Android
+              ...(Platform.OS === 'android' ? { elevation: 8 } : {}),
+            }}
+          >
+            {finalStickyFooter}
+          </View>
+        ) : null}
+      </View>
     </MasterScreenContext.Provider>
   );
 };

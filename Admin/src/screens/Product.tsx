@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+// Admin/src/screens/Product.tsx
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRoute } from '@react-navigation/native';
 import {
   View,
@@ -11,6 +12,7 @@ import {
   Alert,
   TextInput,
   PermissionsAndroid,
+  Animated,
 } from 'react-native';
 import {
   Pencil,
@@ -24,6 +26,7 @@ import {
   Link,
   CloudUpload,
   Check,
+  FileText,
 } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,7 +38,7 @@ import { ImagePreviewModal } from '../components/modals/ImagePreviewModal';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Column } from '../components/table/TableView';
 import { useToast } from '../hooks/useToast';
-import { usePermissions } from '../hooks/usePermissions';
+import { usePermissions, PermissionGuard } from '../hooks/usePermissions';
 import api from '../api/api';
 import { API_URL } from '../utils/constants';
 import { Input } from '../components/ui/Input';
@@ -43,30 +46,31 @@ import { Select } from '../components/ui/Select';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts, FontSizes } from '../styles/globalStyles';
 import { pickImage } from '../utils/permissionUtils';
+import BulkUploadDialog from './BulkUploadDialog';
 
 interface Product {
   id: string; name: string; slug: string; image?: string; images?: string[]; description?: string;
-  mrp: string; sellingPrice: string; rank: number; isActive: boolean;
-  category?: { id: string; name: string }; uom?: { id: string; code: string };
-  stock?: { quantity: number };
-  productTags?: Array<{ tag: { id: string; name: string; color?: string } }>;
+  productCode: string; stock: number; tag?: string; unit?: string;
+  mrp: string; productDiscount?: string; rank: number; isActive: boolean;
+  category?: { id: string; name: string };
 }
 interface Category { id: string; name: string; isActive: boolean; }
-interface UOM { id: string; code: string; name: string; isActive: boolean; }
 
 interface FormState {
   name: string;
   slug: string;
   description: string;
   categoryId: string;
-  uomId: string;
+  productCode: string;
   mrp: string;
-  sellingPrice: string;
+  productDiscount: string;
   rank: string;
-  initialStock: string;
+  stock: string;
+  tag: string;
+  unit: string;
+  perQty: string;
   isActive: boolean;
   imageUrl: string;
-  tagId: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -74,14 +78,16 @@ const EMPTY_FORM: FormState = {
   slug: '',
   description: '',
   categoryId: '',
-  uomId: '',
+  productCode: '',
   mrp: '',
-  sellingPrice: '',
+  productDiscount: '0',
   rank: '0',
-  initialStock: '0',
+  stock: '0',
+  tag: '',
+  unit: '',
+  perQty: '',
   isActive: true,
-  imageUrl: '',
-  tagId: ''
+  imageUrl: ''
 };
 
 const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '');
@@ -127,57 +133,39 @@ const productUi = {
   uploadSoft: '#f7faf8',
 };
 
-
-const UOMBadge = ({ code }: { code?: string }) => (
-  <View 
-    className="bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 flex-row items-center gap-1 self-start"
-    style={{ backgroundColor: '#f5f3ff', borderColor: '#e0e7ff' }}
-  >
-    <View className="w-1 h-1 rounded-full bg-indigo-400" style={{ backgroundColor: '#818cf8' }} />
-    <Text 
-      className="text-[10px] font-black text-indigo-700 uppercase tracking-tighter" 
-      style={{ fontFamily: Fonts.body, color: '#4338ca' }}
-    >
-      {code || '-'}
-    </Text>
-  </View>
-);
-
-
 const getUploadedProductPath = (response: any) => {
   const uploaded = response?.data?.data ?? response?.data ?? response;
   const first = Array.isArray(uploaded) ? uploaded[0] : uploaded;
   return first?.relativePath || first?.url || first?.path || '';
 };
 
-// Slice-like hook for Product operations
+const INR = '\u20b9';
+
+const formatMoney = (value: string | number | undefined) => {
+  const amount = Number(value ?? 0);
+  return `${INR}${Number.isFinite(amount) ? amount.toFixed(2) : '0.00'}`;
+};
+
+const splitUnit = (unit?: string) => {
+  const [label, qty] = (unit ?? '').trim().split(/\s+/, 2);
+  return { label, qty };
+};
+
 export const useProductQueries = () => {
   const qc = useQueryClient();
   const toast = useToast();
 
-  const productsQuery = useQuery<Product[]>({ 
-    queryKey: ['products', 'list'], 
-    queryFn: async () => { 
-      const { data: res } = await api.get('/products?limit=999999'); 
+  const productsQuery = useQuery<Product[]>({
+    queryKey: ['products', 'list'],
+    queryFn: async () => {
+      const { data: res } = await api.get('/products?limit=999999');
       const list = [res, res?.data, res?.data?.data].find(Array.isArray);
       return (list ?? []) as Product[];
-    } 
-  });
-  const catsQuery = useQuery<Category[]>({ queryKey: ['categories-list'], queryFn: async () => { const { data } = await api.get('/categories?limit=999999&isActive=true'); return data.data ?? []; } });
-  const uomsQuery = useQuery<UOM[]>({ 
-    queryKey: ['uoms', 'list'], 
-    queryFn: async () => { 
-      const { data: res } = await api.get('/uoms?limit=999999'); 
-      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
-      return (list ?? []) as UOM[];
-    } 
-  });
-  const tagsQuery = useQuery<any[]>({
-    queryKey: ['tags', 'active-list'],
-    queryFn: async () => {
-      const { data } = await api.get('/tags?limit=999999&isActive=true');
-      return data.data ?? [];
     }
+  });
+  const catsQuery = useQuery<Category[]>({
+    queryKey: ['categories-list'],
+    queryFn: async () => { const { data } = await api.get('/categories?limit=999999&isActive=true'); return data.data ?? []; }
   });
 
   const saveMutation = useMutation({
@@ -192,8 +180,6 @@ export const useProductQueries = () => {
   return {
     query: productsQuery,
     cats: catsQuery.data || [],
-    uoms: uomsQuery.data || [],
-    tags: tagsQuery.data || [],
     save: saveMutation,
     remove: deleteMutation,
     bulkRemove: bulkDeleteMutation,
@@ -203,7 +189,7 @@ export const useProductQueries = () => {
 export default function Product() {
   const toast = useToast();
   const { hasPermission } = usePermissions();
-  const { query, cats, uoms, tags, save, remove, bulkRemove } = useProductQueries();
+  const { query, cats, save, remove, bulkRemove } = useProductQueries();
   const all = Array.isArray(query.data) ? query.data : [];
   const isLoading = query.isLoading;
 
@@ -212,9 +198,23 @@ export default function Product() {
   const [formOpen, setFormOpen] = useState(false); const [editItem, setEditItem] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
   const [deleteId, setDeleteId] = useState<string | null>(null); const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
   const [imageUploading, setImageUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLoadedBytes, setUploadLoadedBytes] = useState(0);
+  const [uploadTotalBytes, setUploadTotalBytes] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: uploadProgress,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [uploadProgress]);
 
   const route = useRoute<any>();
 
@@ -246,14 +246,16 @@ export default function Product() {
       slug: p.slug,
       description: p.description ?? '',
       categoryId: p.category?.id ?? '',
-      uomId: p.uom?.id ?? '',
+      productCode: p.productCode,
       mrp: p.mrp,
-      sellingPrice: p.sellingPrice,
+      productDiscount: p.productDiscount ?? '0',
       rank: String(p.rank),
-      initialStock: String(p.stock?.quantity ?? 0),
+      stock: String(p.stock ?? 0),
+      tag: p.tag ?? '',
+      unit: (p.unit ?? '').split(/\s+/)[0] || '',
+      perQty: (p.unit ?? '').split(/\s+/)[1] || '',
       isActive: p.isActive,
       imageUrl: p.image ?? '',
-      tagId: p.productTags?.[0]?.tag?.id ?? ''
     });
     setImageTab(p.image ? 'url' : 'upload');
     setFormOpen(true);
@@ -265,29 +267,45 @@ export default function Product() {
   };
 
   const uploadProductImage = async (file: any) => {
-    const formData = new FormData();
-    formData.append('productImage', file as any);
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('productImage', file as any);
 
-    const token = await AsyncStorage.getItem('accessToken');
-    const response = await fetch(`${API_URL}/uploads/productImage`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      body: formData,
+      AsyncStorage.getItem('accessToken').then(token => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_URL}/uploads/productImage`);
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadLoadedBytes(event.loaded);
+            setUploadTotalBytes(event.total);
+            setUploadProgress(Math.round((event.loaded * 100) / event.total));
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const uploadedPath = getUploadedProductPath(result);
+              if (!uploadedPath) return reject(new Error('Upload completed, but no image path was returned.'));
+              setForm(prev => ({ ...prev, imageUrl: uploadedPath }));
+              setImageTab('url');
+              toast.success('Product image uploaded');
+              resolve(result);
+            } else {
+              reject(new Error(result?.msg || 'Image upload failed'));
+            }
+          } catch (e) {
+            reject(new Error('Invalid server response'));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network request failed'));
+        xhr.send(formData as any);
+      }).catch(reject);
     });
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result?.msg || 'Image upload failed');
-    }
-
-    const uploadedPath = getUploadedProductPath(result);
-    if (!uploadedPath) {
-      throw new Error('Upload completed, but no image path was returned.');
-    }
-
-    setForm(prev => ({ ...prev, imageUrl: uploadedPath }));
-    setImageTab('url');
-    toast.success('Product image uploaded');
   };
 
   const handlePickAndUploadImage = async () => {
@@ -311,19 +329,25 @@ export default function Product() {
       toast.apiError(error, 'Image upload failed');
     } finally {
       setImageUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const handleSubmit = () => {
+    const combinedUnit = form.unit && form.perQty
+      ? `${form.unit} ${form.perQty}`
+      : form.unit || null;
     save.mutate({
       id: editItem?.id,
       payload: {
         ...form,
         rank: Number(form.rank),
-        quantity: Number(form.initialStock),
+        stock: Number(form.stock),
         image: form.imageUrl,
+        productDiscount: form.productDiscount || '0',
+        tag: form.tag || null,
+        unit: combinedUnit,
         isActive: Boolean(form.isActive),
-        tagId: form.tagId || null,
       }
     }, {
       onSuccess: () => setFormOpen(false)
@@ -333,35 +357,218 @@ export default function Product() {
   const toggleSelect = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const columns: Column<Product>[] = [
-    { key: 'image', label: 'Image', width: 70, render: (p) => {
-      const img = p.image || (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null);
-      return img ? (
-        <TouchableOpacity onPress={() => setPreviewUri(resolveAssetUri(img))}>
-          <Image source={{ uri: resolveAssetUri(img) }} style={{ width: 40, height: 40, borderRadius: Radius.md }} resizeMode="cover" />
-        </TouchableOpacity>
-      ) : (
-        <View style={{ width: 40, height: 40, borderRadius: Radius.md, backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }}>
-          <Package size={18} color={colors.primary} />
+    {
+      key: 'image',
+      label: 'Image',
+      width: 84,
+      align: 'center',
+      render: p => {
+        const img = p.image || (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null);
+        return img ? (
+          <TouchableOpacity onPress={() => setPreviewUri(resolveAssetUri(img))} activeOpacity={0.8}>
+            <Image source={{ uri: resolveAssetUri(img) }} style={{ width: 42, height: 42, borderRadius: Radius.md }} resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 42, height: 42, borderRadius: Radius.md, backgroundColor: productUi.muted, alignItems: 'center', justifyContent: 'center' }}>
+            <Package size={18} color={productUi.primary} strokeWidth={2.25} />
+          </View>
+        );
+      },
+    },
+    {
+      key: 'name',
+      label: 'Product',
+      width: 230,
+      sortable: true,
+      render: p => (
+        <View style={{ minWidth: 0 }}>
+          <Text style={{ fontFamily: Fonts.body, color: productUi.foreground, fontSize: 14, fontWeight: '800' }} numberOfLines={1}>
+            {p.name}
+          </Text>
+          <Text style={{ fontFamily: Fonts.body, color: productUi.mutedForeground, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+            {p.category?.name ?? '-'}
+          </Text>
         </View>
-      );
-    }},
-    { key: 'name', label: 'Product', width: 200, sortable: true, render: (p) => <View><Text className="font-bold text-foreground text-sm" style={{ fontFamily: Fonts.body }} numberOfLines={1}>{p.name}</Text><Text className="text-[10px] text-muted-foreground" style={{ fontFamily: Fonts.body }}>{p.category?.name ?? '-'}</Text></View> },
-    { key: 'mrp', label: 'MRP', width: 90, align: 'right', render: (p) => <Text className="font-bold text-sm" style={{ fontFamily: Fonts.body }}>₹{parseFloat(p.mrp).toFixed(2)}</Text> },
-    { key: 'sellingPrice', label: 'Price', width: 90, align: 'right', render: (p) => <Text className="font-bold text-primary text-sm" style={{ fontFamily: Fonts.body }}>₹{parseFloat(p.sellingPrice).toFixed(2)}</Text> },
-    { key: 'stock', label: 'Stock', width: 70, align: 'center', render: (p) => <Text className="font-bold text-sm" style={{ fontFamily: Fonts.body, color: (p.stock?.quantity ?? 0) === 0 ? colors.destructive : colors.success }}>{p.stock?.quantity ?? 0}</Text> },
-    { key: 'uom', label: 'UOM', width: 70, render: (p) => <UOMBadge code={p.uom?.code} /> },
-    { key: 'tag', label: 'Tag', width: 100, render: (p) => {
-      const tag = p.productTags?.[0]?.tag;
-      if (!tag) return <Text className="text-muted-foreground text-[10px]" style={{ fontFamily: Fonts.body }}>-</Text>;
-      return (
-        <View style={{ backgroundColor: (tag.color ?? colors.primary) + '15', borderColor: tag.color ?? colors.primary, borderWidth: 1 }} className="flex-row items-center gap-1.5 px-2 py-0.5 rounded-full self-start">
-          <View style={{ backgroundColor: tag.color ?? colors.primary }} className="w-1.5 h-1.5 rounded-full" />
-          <Text style={{ color: tag.color ?? colors.primary, fontFamily: Fonts.body }} className="text-[9px] font-black uppercase tracking-wide" numberOfLines={1}>{tag.name}</Text>
+      ),
+    },
+    {
+      key: 'productCode',
+      label: 'Code',
+      width: 100,
+      render: p => (
+        <Text style={{ fontFamily: Fonts.body, color: productUi.mutedForeground, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+          {p.productCode}
+        </Text>
+      ),
+    },
+    {
+      key: 'mrp',
+      label: 'MRP',
+      width: 102,
+      align: 'right',
+      render: p => (
+        <Text
+          style={{
+            fontFamily: Fonts.body,
+            color: productUi.mutedForeground,
+            fontSize: 14,
+            fontWeight: '800',
+          }}
+        >
+          {formatMoney(p.mrp)}
+        </Text>
+      ),
+    },
+    {
+      key: 'productDiscount',
+      label: 'Discount',
+      width: 90,
+      align: 'right',
+      render: p => (
+        <Text style={{ fontFamily: Fonts.body, color: productUi.active, fontSize: 14, fontWeight: '900' }}>
+          {p.productDiscount && p.productDiscount !== '0' ? `${p.productDiscount}%` : '-'}
+        </Text>
+      ),
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      width: 84,
+      align: 'center',
+      render: p => (
+        <Text
+          style={{
+            fontFamily: Fonts.body,
+            color: (p.stock ?? 0) === 0 ? productUi.destructive : productUi.active,
+            fontSize: 14,
+            fontWeight: '900',
+          }}
+        >
+          {p.stock ?? 0}
+        </Text>
+      ),
+    },
+    {
+      key: 'unit',
+      label: 'Unit',
+      width: 88,
+      align: 'center',
+      render: p => {
+        const { label, qty } = splitUnit(p.unit);
+        return label ? (
+          <View
+            style={{
+              minWidth: 50,
+              minHeight: 30,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: Radius.sm,
+              borderWidth: 1,
+              borderColor: '#e0e7ff',
+              backgroundColor: '#f5f3ff',
+              alignItems: 'center',
+              justifyContent: 'center',
+              alignSelf: 'center',
+            }}
+          >
+            <Text style={{ fontFamily: Fonts.body, color: '#4338ca', fontSize: 10, fontWeight: '900', textAlign: 'center' }} numberOfLines={1}>
+              {label.toUpperCase()}
+            </Text>
+            {qty ? (
+              <Text style={{ fontFamily: Fonts.body, color: '#4338ca', fontSize: 10, fontWeight: '800', textAlign: 'center', lineHeight: 11 }} numberOfLines={1}>
+                {qty}
+              </Text>
+            ) : null}
+          </View>
+        ) : <Text style={{ fontFamily: Fonts.body, color: productUi.mutedForeground, fontSize: 12 }}>-</Text>;
+      },
+    },
+    {
+      key: 'tag',
+      label: 'Tag',
+      width: 126,
+      render: p => p.tag ? (
+        // FIX: text color was set to the SAME color as the pill's own background
+        // (productUi.primary on productUi.primary) with fontSize:1 — the tag was
+        // never visible, just a solid green dot/bar. Now uses a light tint
+        // background with the primary color as readable foreground text,
+        // matching the working tag-pill style already used in renderCard below.
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            alignSelf: 'flex-start',
+            maxWidth: '100%',
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: Radius.full,
+            backgroundColor: `${productUi.primary}15`,
+            borderWidth: 1,
+            borderColor: `${productUi.primary}40`,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: Fonts.body,
+              color: productUi.primary,
+              fontSize: 10,
+              fontWeight: '900',
+              textTransform: 'uppercase',
+            }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {p.tag}
+          </Text>
         </View>
-      );
-    } },
-    { key: 'isActive', label: 'Status', width: 90, render: (p) => <StatusBadge status={p.isActive ? 'Active' : 'Inactive'} /> },
-    { key: 'actions', label: 'Actions', width: 110, render: (p) => <View className="flex-row gap-1"><TouchableOpacity onPress={() => p.image && setPreviewUri(resolveAssetUri(p.image))} className="w-8 h-8 rounded-lg bg-muted items-center justify-center"><Eye size={14} color={colors.mutedForeground} /></TouchableOpacity><TouchableOpacity onPress={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-primary/10 items-center justify-center"><Pencil size={14} color={colors.primary} /></TouchableOpacity><TouchableOpacity onPress={() => setDeleteId(p.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity></View> },
+      ) : <Text style={{ fontFamily: Fonts.body, color: productUi.mutedForeground, fontSize: 12 }}>-</Text>,
+    },
+    {
+      key: 'isActive',
+      label: 'Status',
+      width: 108,
+      align: 'center',
+      render: p => <StatusBadge status={p.isActive ? 'Active' : 'Inactive'} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      width: 132,
+      render: p => (
+        <View className="flex-row" style={{ gap: 6 }}>
+          <PermissionGuard module="Products" action="View">
+            <TouchableOpacity
+              onPress={() => p.image && setPreviewUri(resolveAssetUri(p.image))}
+              className="items-center justify-center"
+              style={{ width: 36, height: 36, borderRadius: Radius.md, backgroundColor: productUi.muted }}
+              activeOpacity={0.75}
+            >
+              <Eye size={15} color={productUi.mutedForeground} />
+            </TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Products" action="Update">
+            <TouchableOpacity
+              onPress={() => openEdit(p)}
+              className="items-center justify-center"
+              style={{ width: 36, height: 36, borderRadius: Radius.md, backgroundColor: productUi.primarySoft }}
+              activeOpacity={0.75}
+            >
+              <Pencil size={15} color={productUi.primary} />
+            </TouchableOpacity>
+          </PermissionGuard>
+          <PermissionGuard module="Products" action="Delete">
+            <TouchableOpacity
+              onPress={() => setDeleteId(p.id)}
+              className="items-center justify-center"
+              style={{ width: 36, height: 36, borderRadius: Radius.md, backgroundColor: productUi.destructiveSoft }}
+              activeOpacity={0.75}
+            >
+              <Trash2 size={15} color={productUi.destructive} />
+            </TouchableOpacity>
+          </PermissionGuard>
+        </View>
+      ),
+    },
   ];
 
   const renderCard = (p: Product, _sel: boolean) => (
@@ -387,13 +594,19 @@ export default function Product() {
           <View className="flex-row items-center gap-1.5 mt-1">
             <Text className="text-xs text-muted-foreground" style={{ fontFamily: Fonts.body }}>{p.category?.name}</Text>
             <Text className="text-muted-foreground/30">•</Text>
-            <UOMBadge code={p.uom?.code} />
-            {p.productTags?.[0]?.tag && (
+            <Text className="text-[10px] font-mono text-muted-foreground" style={{ fontFamily: Fonts.body }}>{p.productCode}</Text>
+            {p.unit && (
               <>
                 <Text className="text-muted-foreground/30">•</Text>
-                <View style={{ backgroundColor: (p.productTags[0].tag.color ?? colors.primary) + '15', borderColor: p.productTags[0].tag.color ?? colors.primary, borderWidth: 1 }} className="flex-row items-center gap-1 px-1.5 py-0.5 rounded-full self-start">
-                  <View style={{ backgroundColor: p.productTags[0].tag.color ?? colors.primary }} className="w-1 h-1 rounded-full" />
-                  <Text style={{ color: p.productTags[0].tag.color ?? colors.primary, fontFamily: Fonts.body }} className="text-[8px] font-black uppercase tracking-wide">{p.productTags[0].tag.name}</Text>
+                <Text className="text-[10px] font-black text-indigo-700 uppercase tracking-tighter" style={{ fontFamily: Fonts.body, color: '#4338ca' }}>{p.unit}</Text>
+              </>
+            )}
+            {p.tag && (
+              <>
+                <Text className="text-muted-foreground/30">•</Text>
+                <View style={{ backgroundColor: `${productUi.primary}15`, borderColor: `${productUi.primary}40`, borderWidth: 1 }} className="flex-row items-center gap-1 px-1.5 py-0.5 rounded-full self-start">
+                  <View style={{ backgroundColor: `${productUi.primary}15` }} className="w-1 h-1 rounded-full" />
+                  <Text style={{ color: colors.primary, fontFamily: Fonts.body }} className="text-[8px] font-black uppercase tracking-wide">{p.tag}</Text>
                 </View>
               </>
             )}
@@ -402,18 +615,41 @@ export default function Product() {
       </View>
       <View className="flex-row py-3 gap-4 border-t border-border/40">
         <View className="flex-1"><Text className="text-[9px] font-black text-muted-foreground uppercase" style={{ fontFamily: Fonts.body }}>MRP</Text><Text className="text-sm font-bold" style={{ fontFamily: Fonts.body }}>₹{parseFloat(p.mrp).toFixed(2)}</Text></View>
-        <View className="flex-1"><Text className="text-[9px] font-black text-muted-foreground uppercase" style={{ fontFamily: Fonts.body }}>Price</Text><Text className="text-sm font-bold text-primary" style={{ fontFamily: Fonts.body }}>₹{parseFloat(p.sellingPrice).toFixed(2)}</Text></View>
-        <View className="flex-1"><Text className="text-[9px] font-black text-muted-foreground uppercase" style={{ fontFamily: Fonts.body }}>Stock</Text><Text className="text-sm font-bold" style={{ fontFamily: Fonts.body, color: (p.stock?.quantity ?? 0) === 0 ? colors.destructive : colors.success }}>{p.stock?.quantity ?? 0}</Text></View>
+        <View className="flex-1"><Text className="text-[9px] font-black text-muted-foreground uppercase" style={{ fontFamily: Fonts.body }}>Discount</Text><Text className="text-sm font-bold text-green-600" style={{ fontFamily: Fonts.body }}>{p.productDiscount && p.productDiscount !== '0' ? `${p.productDiscount}%` : '-'}</Text></View>
+        <View className="flex-1"><Text className="text-[9px] font-black text-muted-foreground uppercase" style={{ fontFamily: Fonts.body }}>Stock</Text><Text className="text-sm font-bold" style={{ fontFamily: Fonts.body, color: (p.stock ?? 0) === 0 ? colors.destructive : colors.success }}>{p.stock ?? 0}</Text></View>
       </View>
       <View className="flex-row border-t border-border/40 pt-1">
-        <TouchableOpacity onPress={() => openEdit(p)} className="flex-1 py-3 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={14} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Edit</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setDeleteId(p.id)} className="flex-1 py-3 flex-row items-center justify-center gap-2"><Trash2 size={14} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
+        <PermissionGuard module="Products" action="Update">
+          <TouchableOpacity onPress={() => openEdit(p)} className="flex-1 py-3 flex-row items-center justify-center gap-2 border-r border-border/40"><Pencil size={14} color={colors.primary} /><Text className="text-xs font-bold text-primary" style={{ fontFamily: Fonts.body }}>Edit</Text></TouchableOpacity>
+        </PermissionGuard>
+        <PermissionGuard module="Products" action="Delete">
+          <TouchableOpacity onPress={() => setDeleteId(p.id)} className="flex-1 py-3 flex-row items-center justify-center gap-2"><Trash2 size={14} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
+        </PermissionGuard>
       </View>
     </View>
   );
 
   return (
-    <MasterScreenLayout title="Products" subtitle="Manage product catalog" onAddNew={openAdd} addNewLabel="Add Product">
+    <MasterScreenLayout title="Products" subtitle="Manage product catalog" module="Products" onAddNew={openAdd} addNewLabel="Add Product"
+      extraHeaderContent={
+        <TouchableOpacity
+          onPress={() => setBulkUploadOpen(true)}
+          activeOpacity={0.7}
+          className="flex-row items-center justify-center"
+          style={{
+            backgroundColor: 'white',
+            paddingHorizontal: 20,
+            height: 44,
+            borderWidth: 1,
+            borderColor: '#e6dfd7',
+            borderRadius: Radius.lg,
+          }}
+        >
+          <FileText size={18} color="#667a70" strokeWidth={2} />
+          <Text style={{ color: '#667a70', fontSize: 14, fontWeight: '700', marginLeft: 8, fontFamily: Fonts.body }}>Bulk Upload</Text>
+        </TouchableOpacity>
+      }
+    >
       <AdaptiveTable
         data={data} columns={columns} loading={isLoading} emptyText="No products found"
         searchValue={search} onSearchChange={setSearch}
@@ -427,6 +663,7 @@ export default function Product() {
         onSelectRow={toggleSelect} onBulkDelete={selectedIds.size > 0 ? () => setBulkDeleteOpen(true) : undefined}
         exportTitle="Products Report" exportFilename="products"
         renderCard={renderCard}
+        module="Products"
       />
 
       <FormModal
@@ -468,7 +705,6 @@ export default function Product() {
         }
       >
         <View style={{ gap: 20 }}>
-          {/* Image Source Selection */}
           <View
             style={{
               borderWidth: 1,
@@ -518,27 +754,75 @@ export default function Product() {
 
             {imageTab === 'upload' ? (
               <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={handlePickAndUploadImage}
                 disabled={imageUploading}
-                className="border-2 border-dashed items-center justify-center p-6"
-                style={{ borderRadius: Radius.lg, borderColor: productUi.border, backgroundColor: productUi.card, minHeight: 168, opacity: imageUploading ? 0.72 : 1 }}
+                // @ts-ignore Web drag and drop events
+                onDragOver={(e: any) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e: any) => { e.preventDefault(); setIsDragging(false); }}
+                onDrop={async (e: any) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (imageUploading) return;
+                  if (!hasPermission('media-library', 'create') && !hasPermission('Media Library', 'Create')) {
+                    toast.warn('You do not have upload permission.');
+                    return;
+                  }
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) {
+                    try {
+                      setImageUploading(true);
+                      await uploadProductImage(file);
+                    } catch (err: any) {
+                      toast.apiError(err, 'Image upload failed');
+                    } finally {
+                      setImageUploading(false);
+                      setUploadProgress(0);
+                    }
+                  }
+                }}
+                className="border-2 border-dashed items-center justify-center p-6 overflow-hidden"
+                style={{
+                  borderRadius: Radius.lg,
+                  borderColor: isDragging ? productUi.primary : productUi.border,
+                  backgroundColor: isDragging ? productUi.primarySoft : productUi.card,
+                  minHeight: 168
+                }}
               >
-                <CloudUpload size={40} color={productUi.primary} style={{ marginBottom: 12 }} strokeWidth={2.25} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: productUi.foreground, fontFamily: Fonts.body }}>
-                  {imageUploading ? 'Uploading image...' : 'Click to browse image'}
-                </Text>
-                <Text style={{ fontSize: 12, color: productUi.mutedForeground, marginTop: 4, fontFamily: Fonts.body }}>
-                  {imageUploading ? 'Please wait while the file is uploaded' : 'Supports JPG, PNG, GIF, WEBP'}
-                </Text>
-
-                {form.imageUrl ? (
-                  <View style={{ marginTop: 16, alignItems: 'center' }}>
-                    <Image source={{ uri: resolveAssetUri(form.imageUrl) }} style={{ width: 144, height: 144, borderRadius: Radius.md }} resizeMode="cover" />
-                    <TouchableOpacity onPress={() => setForm({ ...form, imageUrl: '' })} style={{ marginTop: 8 }}>
-                      <Text style={{ color: productUi.destructive, fontSize: 12, fontWeight: '600', fontFamily: Fonts.body }}>Remove</Text>
-                    </TouchableOpacity>
+                {imageUploading ? (
+                  <View style={{ width: '100%', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: productUi.primary, fontFamily: Fonts.body, marginBottom: 12 }}>
+                      Uploading... {uploadProgress}%
+                    </Text>
+                    <View style={{ width: '100%', height: 8, backgroundColor: productUi.muted, borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                      <Animated.View style={{ height: '100%', backgroundColor: productUi.primary, width: progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} />
+                    </View>
+                    {uploadTotalBytes > 0 && (
+                      <Text style={{ fontSize: 11, color: productUi.mutedForeground, fontFamily: Fonts.body }}>
+                        {(uploadLoadedBytes / (1024 * 1024)).toFixed(2)} MB / {(uploadTotalBytes / (1024 * 1024)).toFixed(2)} MB
+                      </Text>
+                    )}
                   </View>
-                ) : null}
+                ) : (
+                  <>
+                    <CloudUpload size={40} color={productUi.primary} style={{ marginBottom: 12 }} strokeWidth={2.25} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: productUi.foreground, fontFamily: Fonts.body }}>
+                      {isDragging ? 'Drop image here' : 'Click or drag to browse image'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: productUi.mutedForeground, marginTop: 4, fontFamily: Fonts.body }}>
+                      Supports JPG, PNG, GIF, WEBP
+                    </Text>
+
+                    {form.imageUrl ? (
+                      <View style={{ marginTop: 16, alignItems: 'center' }}>
+                        <Image source={{ uri: resolveAssetUri(form.imageUrl) }} style={{ width: 144, height: 144, borderRadius: Radius.md }} resizeMode="cover" />
+                        <TouchableOpacity onPress={() => setForm({ ...form, imageUrl: '' })} style={{ marginTop: 8 }}>
+                          <Text style={{ color: productUi.destructive, fontSize: 12, fontWeight: '600', fontFamily: Fonts.body }}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                )}
               </TouchableOpacity>
             ) : (
               <View>
@@ -594,8 +878,23 @@ export default function Product() {
             </View>
           </View>
 
-          {/* Category & UOM Grid */}
+          {/* Product Code (auto-generated, read-only when editing) & Category Grid */}
           <View className="flex-row" style={{ gap: 16 }}>
+            {editItem ? (
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: productUi.foreground, fontSize: 13, fontWeight: '700', marginBottom: 6, fontFamily: Fonts.body }}>Product Code</Text>
+                <View style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, backgroundColor: productUi.muted, justifyContent: 'center', paddingHorizontal: 16 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: productUi.foreground, fontFamily: 'monospace' }}>{form.productCode}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: productUi.foreground, fontSize: 13, fontWeight: '700', marginBottom: 6, fontFamily: Fonts.body }}>Product Code</Text>
+                <View style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, backgroundColor: productUi.muted, justifyContent: 'center', paddingHorizontal: 16 }}>
+                  <Text style={{ fontSize: 13, color: productUi.mutedForeground, fontFamily: Fonts.body }}>Auto-generated (e.g. CK100)</Text>
+                </View>
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Select
                 label="Category"
@@ -606,30 +905,47 @@ export default function Product() {
                 placeholder="Select category"
               />
             </View>
+          </View>
+
+          {/* Unit + Per Qty & Tag Grid */}
+          <View className="flex-row" style={{ gap: 16 }}>
             <View style={{ flex: 1 }}>
-              <Select
-                label="UOM"
-                required
-                value={form.uomId}
-                onValueChange={v => setForm({ ...form, uomId: v })}
-                options={uoms.filter(u => u.isActive).map(u => ({ label: `${u.name} (${u.code})`, value: u.id }))}
-                placeholder="Select UOM"
+              <Input
+                label="Unit"
+                value={form.unit}
+                onChangeText={v => setForm({ ...form, unit: v })}
+                placeholder="e.g. PCS, KG, BOX"
+                placeholderTextColor={productUi.mutedForeground}
+                className="px-3"
+                style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Per Qty"
+                value={form.perQty}
+                onChangeText={v => setForm({ ...form, perQty: v })}
+                placeholder="e.g. 10, 50, 100"
+                keyboardType="numeric"
+                placeholderTextColor={productUi.mutedForeground}
+                className="px-3"
+                style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
               />
             </View>
           </View>
-
-          {/* Tags Dropdown (Optional) */}
-          <View>
-            <Select
-              label="Tag (Optional)"
-              value={form.tagId}
-              onValueChange={v => setForm({ ...form, tagId: v })}
-              options={[
-                { label: 'None (Deselect)', value: '' },
-                ...tags.filter(t => t.isActive).map(t => ({ label: t.name, value: t.id }))
-              ]}
-              placeholder="No tag selected"
-            />
+          <View className="flex-row" style={{ gap: 16 }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                label="Tag"
+                value={form.tag}
+                onChangeText={v => setForm({ ...form, tag: v })}
+                placeholder="e.g. Bestseller, New"
+                placeholderTextColor={productUi.mutedForeground}
+                className="px-3"
+                style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
+              />
+            </View>
+            <View style={{ flex: 1 }} />
           </View>
 
           {/* Price Grid */}
@@ -649,16 +965,18 @@ export default function Product() {
             </View>
             <View style={{ flex: 1 }}>
               <Input
-                label="Selling Price ₹"
-                required
-                value={form.sellingPrice}
-                onChangeText={v => setForm({ ...form, sellingPrice: v })}
-                placeholder="0.00"
+                label="Product Discount (%)"
+                value={form.productDiscount}
+                onChangeText={v => setForm({ ...form, productDiscount: v })}
+                placeholder="e.g. 15"
                 keyboardType="numeric"
                 placeholderTextColor={productUi.mutedForeground}
                 className="px-3"
                 style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
               />
+              <Text style={{ color: productUi.mutedForeground, fontSize: 11, marginTop: 4, fontFamily: Fonts.body }}>
+                Applied specifically to this product (highest priority).
+              </Text>
             </View>
           </View>
 
@@ -686,17 +1004,17 @@ export default function Product() {
                 required
                 value={form.rank}
                 onChangeText={v => setForm({ ...form, rank: v })}
-                placeholder="Unique rank"
+                placeholder="Display order"
                 keyboardType="numeric"
                 style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Input
-                label="Initial Stock"
+                label="Stock"
                 required
-                value={form.initialStock}
-                onChangeText={v => setForm({ ...form, initialStock: v })}
+                value={form.stock}
+                onChangeText={v => setForm({ ...form, stock: v })}
                 placeholder="0"
                 keyboardType="numeric"
                 style={{ height: 48, borderRadius: Radius.lg, borderWidth: 1, borderColor: productUi.border, fontSize: 14, color: productUi.foreground, fontFamily: Fonts.body, outline: 'none', backgroundColor: productUi.card } as any}
@@ -757,7 +1075,7 @@ export default function Product() {
       <DeleteConfirmModal open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)} itemName="product" onConfirm={() => deleteId && remove.mutate(deleteId, { onSuccess: () => setDeleteId(null) })} loading={remove.isPending} />
       <DeleteConfirmModal open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} count={selectedIds.size} itemName="product" onConfirm={() => bulkRemove.mutate([...selectedIds], { onSuccess: () => { setSelectedIds(new Set()); setBulkDeleteOpen(false); } })} loading={bulkRemove.isPending} />
       <ImagePreviewModal open={!!previewUri} uri={previewUri} onClose={() => setPreviewUri(null)} />
+      <BulkUploadDialog open={bulkUploadOpen} onClose={() => setBulkUploadOpen(false)} />
     </MasterScreenLayout>
   );
 }
-
