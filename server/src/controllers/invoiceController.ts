@@ -4,6 +4,7 @@ import { db } from '../db/index.js';
 import { invoices, invoiceItems, customers } from '../db/schema/invoices.js';
 import { products } from '../db/schema/category.js';
 import { settings } from '../db/schema/settings.js';
+import type { InferSelectModel, SQL } from 'drizzle-orm';
 import { eq, inArray, desc, and, or, ilike, sql } from 'drizzle-orm';
 import { generateInvoiceNumber } from '../utils/helpers.js';
 import { decrypt, encrypt } from '../utils/crypto.js';
@@ -20,6 +21,21 @@ import {
 import { numberToWords } from '../utils/helpers.js';
 
 dotenv.config();
+
+type PaymentMethodValue = 'cash' | 'upi' | 'card';
+
+interface InvoiceItemInput {
+    productId?: string;
+    productName?: string;
+    quantity: number;
+    unitPrice: string;
+    totalPrice: string;
+}
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    return String(error);
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Helper: Generate QR Code
@@ -65,7 +81,26 @@ export const createInvoice = async (req: Request, res: Response) => {
             igstAmount,
             notes,
             items,
-        } = req.body;
+        } = req.body as {
+            customerId: string;
+            paymentMethod?: string;
+            subTotal?: string;
+            discountAmount?: string;
+            taxAmount?: string;
+            totalAmount?: string;
+            gstEnabled?: boolean;
+            gstType?: string;
+            gstPercentage?: string;
+            taxableAmount?: string;
+            cgstPercentage?: string;
+            cgstAmount?: string;
+            sgstPercentage?: string;
+            sgstAmount?: string;
+            igstPercentage?: string;
+            igstAmount?: string;
+            notes?: string;
+            items: InvoiceItemInput[];
+        };
 
         if (!customerId) {
             return res.status(400).json({ success: false, msg: 'customerId is required' });
@@ -83,7 +118,7 @@ export const createInvoice = async (req: Request, res: Response) => {
             const invoiceNumber = await generateInvoiceNumber();
             const [newInvoice] = await tx.insert(invoices).values({
                 invoiceNumber,
-                userId: (req as any).user?.id ?? null,
+                userId: req.user?.id ?? null,
                 customerId,
                 subTotal: subTotal?.toString() ?? '0',
                 discountAmount: discountAmount?.toString() ?? '0',
@@ -91,25 +126,25 @@ export const createInvoice = async (req: Request, res: Response) => {
                 totalAmount: totalAmount?.toString() ?? '0',
                 // GST
                 gstEnabled: !!gstEnabled,
-                gstType: gstType ?? 'INSIDE_TN',
-                gstPercentage: parseFloat(gstPercentage) || 0,
+                gstType: (gstType ?? 'INSIDE_TN') as 'INSIDE_TN' | 'OUTSIDE_TN',
+                gstPercentage: parseFloat(gstPercentage ?? '0') || 0,
                 taxableAmount: taxableAmount?.toString() ?? '0',
-                cgstPercentage: parseFloat(cgstPercentage) || 0,
+                cgstPercentage: parseFloat(cgstPercentage ?? '0') || 0,
                 cgstAmount: cgstAmount?.toString() ?? '0',
-                sgstPercentage: parseFloat(sgstPercentage) || 0,
+                sgstPercentage: parseFloat(sgstPercentage ?? '0') || 0,
                 sgstAmount: sgstAmount?.toString() ?? '0',
-                igstPercentage: parseFloat(igstPercentage) || 0,
+                igstPercentage: parseFloat(igstPercentage ?? '0') || 0,
                 igstAmount: igstAmount?.toString() ?? '0',
-                paymentMethod: paymentMethod ?? 'cash',
+                paymentMethod: (paymentMethod ?? 'cash') as PaymentMethodValue,
                 notes: notes ?? null,
             }).returning();
 
             // Insert items with product snapshot
             for (const item of items) {
-                let productSnapshot: any = null;
+                let productSnapshot: InferSelectModel<typeof products> | null = null;
                 if (item.productId) {
                     const [p] = await tx.select().from(products).where(eq(products.id, item.productId)).limit(1);
-                    productSnapshot = p;
+                    productSnapshot = p ?? null;
                 }
 
                 await tx.insert(invoiceItems).values({
@@ -128,9 +163,9 @@ export const createInvoice = async (req: Request, res: Response) => {
         });
 
         res.status(201).json({ success: true, data: invoice });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Create Invoice Error:', error);
-        res.status(500).json({ success: false, msg: error.message });
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -146,7 +181,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
         const paymentMethodFilter = req.query.paymentMethod as string;
         const offset = (page - 1) * limit;
 
-        let searchFilters: any[] = [];
+        const searchFilters: (SQL | undefined)[] = [];
 
         if (search) {
             const matchedCustomers = await db.select({ id: customers.id })
@@ -165,7 +200,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
         }
 
         if (paymentMethodFilter) {
-            searchFilters.push(eq(invoices.paymentMethod, paymentMethodFilter as any));
+            searchFilters.push(eq(invoices.paymentMethod, paymentMethodFilter as PaymentMethodValue));
         }
 
         const finalWhere = searchFilters.length > 0 ? and(...searchFilters) : undefined;
@@ -189,9 +224,9 @@ export const getAllInvoices = async (req: Request, res: Response) => {
             data,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Get All Invoices Error:', error);
-        res.status(500).json({ success: false, msg: error.message });
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -210,8 +245,8 @@ export const getInvoiceById = async (req: Request, res: Response) => {
 
         if (!invoice) return res.status(404).json({ success: false, msg: 'Invoice not found' });
         res.json({ success: true, data: invoice });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+    } catch (error) {
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -232,8 +267,8 @@ export const updateInvoice = async (req: Request, res: Response) => {
 
         if (!invoice) return res.status(404).json({ success: false, msg: 'Invoice not found' });
         res.json({ success: true, data: invoice });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+    } catch (error) {
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -249,8 +284,8 @@ export const deleteInvoice = async (req: Request, res: Response) => {
         const result = await db.delete(invoices).where(eq(invoices.id, id));
         if (!result.rowCount) return res.status(404).json({ success: false, msg: 'Invoice not found' });
         res.json({ success: true, msg: 'Invoice deleted' });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+    } catch (error) {
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -265,8 +300,8 @@ export const bulkDeleteInvoices = async (req: Request, res: Response) => {
         for (const id of ids) await db.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
         const result = await db.delete(invoices).where(inArray(invoices.id, ids));
         res.json({ success: true, msg: `${result.rowCount} invoices deleted` });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+    } catch (error) {
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -283,8 +318,8 @@ export const getInvoiceToken = async (req: Request, res: Response) => {
 
         const token = encrypt(id);
         res.json({ success: true, data: { token } });
-    } catch (error: any) {
-        res.status(500).json({ success: false, msg: error.message });
+    } catch (error) {
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
 
@@ -311,9 +346,7 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
 
         if (!invoiceData) return res.status(404).json({ success: false, msg: 'Invoice not found' });
 
-        const shopSettings = await db.select().from(settings).limit(1);
-        const shopInfo = shopSettings[0] || {} as any;
-
+        const settingsRow = await db.select().from(settings).limit(1);
         const baseUrl = process.env.BASE_URL || `https://${req.get('host')}`;
         const verificationUrl = `${baseUrl}/api/v1/invoices/pdf/${encryptedId}`;
         const templateId = req.query.template as string;
@@ -322,21 +355,26 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
         let payQrCodeUrl = emptyGif;
         let verifyQrCodeUrl = emptyGif;
 
-        const isQrEnabled = !!shopInfo.invoiceQrStatus;
+        const isQrEnabled = !!settingsRow[0]?.invoiceQrStatus;
         if (isQrEnabled) {
             const upiId = process.env.UPI_ID || 'merchant@upi';
-            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopInfo.shopName || 'CRACKERS KINGDOM')}&am=${parseFloat(invoiceData.totalAmount).toFixed(2)}&tn=${encodeURIComponent(`Invoice ${invoiceData.invoiceNumber}`)}&cu=INR`;
+            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(settingsRow[0]?.shopName || 'CRACKERS KINGDOM')}&am=${parseFloat(invoiceData.totalAmount).toFixed(2)}&tn=${encodeURIComponent(`Invoice ${invoiceData.invoiceNumber}`)}&cu=INR`;
             payQrCodeUrl = await generateInvoiceQR(upiString);
             verifyQrCodeUrl = await generateInvoiceQR(verificationUrl);
         }
 
+        const s = settingsRow[0];
         const shopMapped = {
-            name: shopInfo.shopName || 'CRACKERS KINGDOM',
-            address: shopInfo.shopAddress || '',
-            phone: shopInfo.shopPhone || '',
-            email: shopInfo.shopEmail || '',
-            gstin: shopInfo.shopGst || '',
-            website: shopInfo.shopWebsite || '',
+            name: s?.shopName || 'CRACKERS KINGDOM',
+            address: s?.shopAddress || '',
+            phone: s?.shopPhone || '',
+            email: s?.shopEmail || '',
+            gstin: s?.shopGst || '',
+            website: s?.shopWebsite || '',
+        };
+
+        type InvoiceItemWithProduct = InferSelectModel<typeof invoiceItems> & {
+            product?: InferSelectModel<typeof products> | null;
         };
 
         const invoiceMapped = {
@@ -346,7 +384,7 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
             customerAddress: invoiceData.customer?.address || '',
             customerEmail: invoiceData.customer?.email || '',
             customerPhone: invoiceData.customer?.phone || '',
-            items: invoiceData.items.map((item: any) => ({
+            items: invoiceData.items.map((item: InvoiceItemWithProduct) => ({
                 name: item.productName || item.product?.name || 'Unknown',
                 description: item.productContent || item.product?.slug || '',
                 unit: item.product?.unit || 'Nos',
@@ -383,18 +421,18 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
             invoiceNumber: invoiceData.invoiceNumber,
             invoiceDate: invoiceDateStr,
             company: {
-                name: shopInfo.shopName || 'CRACKERS KINGDOM',
-                addressLines: (shopInfo.shopAddress || '').split(',').map((s: string) => s.trim()).filter(Boolean),
-                phone: shopInfo.shopPhone || '',
-                email: shopInfo.shopEmail || '',
-                gstin: shopInfo.shopGst || ''
+                name: s?.shopName || 'CRACKERS KINGDOM',
+                addressLines: (s?.shopAddress || '').split(',').map((l: string) => l.trim()).filter(Boolean),
+                phone: s?.shopPhone || '',
+                email: s?.shopEmail || '',
+                gstin: s?.shopGst || ''
             },
             billTo: {
                 name: invoiceData.customer?.name || '',
-                addressLines: (invoiceData.customer?.address || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+                addressLines: (invoiceData.customer?.address || '').split(',').map((l: string) => l.trim()).filter(Boolean),
                 phone: invoiceData.customer?.phone || ''
             },
-            items: invoiceData.items.map((item: any) => ({
+            items: invoiceData.items.map((item: InvoiceItemWithProduct) => ({
                 description: item.productName || item.product?.name || 'Unknown',
                 subDescription: item.productContent || item.product?.slug || '',
                 uom: item.product?.unit || 'Nos',
@@ -417,8 +455,8 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="invoice_${invoiceData.invoiceNumber}.pdf"`);
         res.send(pdf);
-    } catch (error: any) {
+    } catch (error) {
         console.error('Get Invoice PDF Error:', error);
-        res.status(500).json({ success: false, msg: error.message });
+        res.status(500).json({ success: false, msg: getErrorMessage(error) });
     }
 };
