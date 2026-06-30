@@ -1,73 +1,81 @@
-// Web shim for @react-native-firebase/messaging
-// Bridges the RN Firebase messaging API to the Firebase JS SDK (web)
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+// Admin/src/shims/react-native-firebase-messaging.web.js
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { app, VAPID_KEY } from '../lib/firebaseConfig.web';
 
-let _messaging = null;
+const SW_PATH = '/firebase-messaging-sw.js'; // change if served under a subpath, e.g. '/demo/admin/firebase-messaging-sw.js'
 
-function getWebMessaging() {
-  if (!_messaging) {
+let messagingInstance = null;
+let swRegistration = null;
+
+const AuthorizationStatus = { NOT_DETERMINED: -1, DENIED: 0, AUTHORIZED: 1, PROVISIONAL: 2 };
+
+async function ensureMessaging() {
+  if (messagingInstance) return messagingInstance;
+  const supported = await isSupported().catch(() => false);
+  if (!supported) return null;
+
+  if ('serviceWorker' in navigator) {
     try {
-      _messaging = getMessaging(app);
-    } catch (e) {
-      console.warn('[FCM Web Shim] Could not initialise web messaging:', e);
+      swRegistration = await navigator.serviceWorker.register(SW_PATH);
+    } catch (err) {
+      console.warn('[push] service worker registration failed', err);
     }
   }
-  return _messaging;
+
+  try {
+    messagingInstance = getMessaging(app);
+  } catch (error) {
+    console.warn('[push] messaging service not available', error);
+    return null;
+  }
+  return messagingInstance;
 }
 
-export default function messaging() {
+function messaging() {
   return {
     requestPermission: async () => {
+      if (typeof Notification === 'undefined') return AuthorizationStatus.DENIED;
       const permission = await Notification.requestPermission();
-      if (permission === 'granted') return 1;   // AUTHORIZED
-      if (permission === 'denied')  return 0;   // DENIED
-      return -1;                                 // NOT_DETERMINED
+      return permission === 'granted' ? AuthorizationStatus.AUTHORIZED : AuthorizationStatus.DENIED;
     },
 
     getToken: async () => {
-      const m = getWebMessaging();
-      if (!m) return null;
+      const instance = await ensureMessaging();
+      if (!instance) return null;
+      if (!VAPID_KEY) {
+        console.warn('[push] VAPID_KEY is empty — web tokens cannot be generated without it.');
+        return null;
+      }
       try {
-        const opts = VAPID_KEY ? { vapidKey: VAPID_KEY } : undefined;
-        const token = await getToken(m, opts);
-        return token || null;
-      } catch (e) {
-        console.warn('[FCM Web Shim] getToken failed:', e);
+        return (await getToken(instance, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swRegistration || undefined,
+        })) || null;
+      } catch (err) {
+        console.warn('[push] getToken failed', err);
         return null;
       }
     },
 
-    onTokenRefresh: (callback) => {
-      // Firebase JS SDK v9+ doesn't have a dedicated onTokenRefresh.
-      // Token refresh happens automatically; we no-op here.
-      return () => {};
-    },
+    // Web tokens don't rotate the way native ones do — kept as a no-op for a matching call signature.
+    onTokenRefresh: () => () => { },
 
     onMessage: (callback) => {
-      const m = getWebMessaging();
-      if (!m) return () => {};
-      return onMessage(m, (payload) => {
-        // Re-shape the web payload to match RN Firebase's RemoteMessage
-        const remoteMessage = {
-          notification: payload.notification || {},
-          data: payload.data || {},
-          messageId: payload.messageId,
-        };
-        callback(remoteMessage);
+      let unsubscribe = () => { };
+      ensureMessaging().then((instance) => {
+        if (instance) unsubscribe = onMessage(instance, callback);
+      }).catch(err => {
+        console.warn('[push] ensureMessaging failed in onMessage', err);
       });
+      return () => unsubscribe();
     },
 
-    onNotificationOpenedApp: () => () => {},
+    // Web push doesn't support notification-opened-app detection the same way native does.
+    onNotificationOpenedApp: () => () => { },
     getInitialNotification: async () => null,
-    setBackgroundMessageHandler: async () => {},
+    setBackgroundMessageHandler: () => { }, // handled in firebase-messaging-sw.js instead
   };
 }
 
-messaging.AuthorizationStatus = {
-  NOT_DETERMINED: -1,
-  DENIED: 0,
-  AUTHORIZED: 1,
-  PROVISIONAL: 2,
-  EPHEMERAL: 3,
-};
+messaging.AuthorizationStatus = AuthorizationStatus;
+export default messaging;

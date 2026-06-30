@@ -151,7 +151,7 @@ describe('BulkUploadDialog', () => {
 describe('parseCSV', () => {
   it('parses CSV with empty productCode correctly without column shift', () => {
     const csv =
-      'productCode,name,description,mrp,sellingPrice,stock,tag,unit,perQty,status,image\n' +
+      'productCode,name,description,mrp,productDiscount,stock,tag,unit,perQty,status,image\n' +
       ',Ground Chakkar Normal,Traditional spinning firework,50,35,50,Popular,Box,10,Active,\n' +
       ',Ground Chakkar Deluxe,Larger spin with bright sparks,90,70,50,Trending,Box,10,Active,';
     const rows = parseCSV(csv);
@@ -160,7 +160,7 @@ describe('parseCSV', () => {
     expect(rows[0].name).toBe('Ground Chakkar Normal');
     expect(rows[0].description).toBe('Traditional spinning firework');
     expect(rows[0].mrp).toBe('50');
-    expect(rows[0].sellingPrice).toBe('35');
+    expect(rows[0].productDiscount).toBe('35');
     expect(rows[0].stock).toBe('50');
     expect(rows[0].tag).toBe('Popular');
     expect(rows[0].unit).toBe('Box');
@@ -171,7 +171,7 @@ describe('parseCSV', () => {
 
   it('handles quoted fields with commas', () => {
     const csv =
-      'productCode,name,description,mrp,sellingPrice,stock,tag,unit,perQty,status,image\n' +
+      'productCode,name,description,mrp,productDiscount,stock,tag,unit,perQty,status,image\n' +
       'CK100,"Test, Product",Desc,100,80,50,Trending,PCS,10,Active,';
     const rows = parseCSV(csv);
     expect(rows[0].name).toBe('Test, Product');
@@ -179,7 +179,7 @@ describe('parseCSV', () => {
 
   it('handles trailing comma (empty image field)', () => {
     const csv =
-      'productCode,name,description,mrp,sellingPrice,stock,tag,unit,perQty,status,image\n' +
+      'productCode,name,description,mrp,productDiscount,stock,tag,unit,perQty,status,image\n' +
       'CK100,Test,Desc,100,80,50,Trending,PCS,10,Active,';
     const rows = parseCSV(csv);
     expect(rows[0].image).toBe('');

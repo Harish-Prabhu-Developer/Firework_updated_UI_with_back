@@ -28,6 +28,7 @@ import { useShopSettings } from "@/lib/businessInfo";
 import { useQuery } from "@tanstack/react-query";
 import { API_BASE_URL, productService } from "@/services/api";
 import chakkars from "@/assets/chakkars.jpg";
+import defaultLogo from "@/assets/logo.png";
 
 const stats = [
   { icon: Users, value: "500+", label: "HAPPY CUSTOMERS" },
@@ -108,20 +109,78 @@ const howItWorks = [
   },
 ];
 
-const indexStructuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "Premium Sivakasi Fireworks Estimate Online",
-  description:
-    "Explore premium Sivakasi fireworks, compare categories, and submit your estimate online. Legal parcel dispatch across India with a fast 2-hour response.",
-  url: "https://crackerskingdom.in/",
-  inLanguage: "en-IN",
-  isPartOf: {
-    "@type": "WebSite",
-    name: "Crackers Kingdom",
-    url: "https://crackerskingdom.in",
+const indexStructuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Crackers Kingdom — Premium Sivakasi Fireworks Estimate Online",
+    description:
+      "Explore premium Sivakasi fireworks at Crackers Kingdom (crackerskingdom.in). Compare categories, submit your estimate online, and get a confirmation call within 2 hours. Legal parcel dispatch across India.",
+    url: "https://crackerskingdom.in/",
+    inLanguage: "en-IN",
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": "https://crackerskingdom.in/#website",
+      name: "Crackers Kingdom",
+      url: "https://crackerskingdom.in",
+    },
+    about: {
+      "@type": "Thing",
+      name: "Sivakasi Fireworks",
+      description: "Premium fireworks sourced from Sivakasi, the fireworks capital of India.",
+    },
+    speakable: {
+      "@type": "SpeakableSpecification",
+      cssSelector: ["h1", "h2", ".container-narrow p"],
+    },
   },
-};
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "How to order fireworks from Crackers Kingdom?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Visit the Estimate page on crackerskingdom.in, browse the full product list, and select quantities for the items you want. Click 'Place Enquiry' and our team will call you within 2 hours to confirm your order.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Does Crackers Kingdom deliver fireworks across India?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes! Though based in Sivakasi, Crackers Kingdom serves customers across India through registered legal parcel transport services. You collect your order at the nearest parcel center in your city.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Is Crackers Kingdom a licensed fireworks seller?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes. Crackers Kingdom operates under M/S NANDHINI TRADERS (Survey No: 299/13A1C, 299/15A2) with a valid license. All products comply with government safety standards and Supreme Court guidelines.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What is the minimum order amount at Crackers Kingdom?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "The minimum order value at Crackers Kingdom is ₹3,000. We offer exciting discounts of up to 40% on bulk orders during the Diwali season.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What is the difference between crackerskingdom.in and crackerskingdom.com?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "crackerskingdom.in is the official website of Crackers Kingdom, a licensed Sivakasi fireworks shop operated by M/S NANDHINI TRADERS. We are the authentic Crackers Kingdom brand based in Sivakasi, Tamil Nadu, India.",
+        },
+      },
+    ],
+  },
+];
 
 const Index = () => {
   const { settings } = useShopSettings();
@@ -139,7 +198,7 @@ const Index = () => {
   });
 
   const getImageUrl = (img?: string) => {
-    if (!img) return chakkars;
+    if (!img) return defaultLogo;
     if (img.startsWith("http")) return img;
     const cleanPath = img.replace(/\\/g, '/').replace(/^\//, '');
     return `${API_BASE_URL}/${cleanPath}`;
@@ -185,10 +244,10 @@ const Index = () => {
   return (
     <div className="bg-background">
       <SEO
-        title="Premium Sivakasi Fireworks Estimate Online"
-        description="Explore premium Sivakasi fireworks, compare categories, and submit your estimate online. Legal parcel dispatch across India with a fast 2-hour response."
+        title="Crackers Kingdom Sivakasi — Premium Fireworks Estimate Online"
+        description="Crackers Kingdom (crackerskingdom.in) — explore premium Sivakasi fireworks, compare categories, and submit your estimate online. Get a confirmation call within 2 hours. Legal parcel dispatch across India."
         canonical="/"
-        keywords="Sivakasi fireworks, crackers estimate online, Diwali crackers, fireworks delivery India, Crackers Kingdom"
+        keywords="Sivakasi fireworks, crackers estimate online, Diwali crackers, fireworks delivery India, buy sivakasi crackers online, fireworks price list, diwali fireworks estimate"
         ogImage="/og/index-og.svg?v=2"
         structuredData={indexStructuredData}
       />
@@ -359,7 +418,7 @@ const Index = () => {
             {displayCategories.map((c, i) => (
               <ScrollReveal key={c.id} delay={i * 0.07}>
                 <Link to="/products" className="group relative block aspect-square rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-                  <img src={c.isDynamic ? getImageUrl(c.image) : c.image} alt={c.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={c.isDynamic ? getImageUrl(c.image) : c.image} alt={c.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.currentTarget as HTMLImageElement).src = defaultLogo; }} />
                   <div className="absolute inset-0 bg-linear-to-t from-foreground/80 via-foreground/20 to-transparent" />
                   <div className="absolute bottom-4 left-4">
                     <h3 className="font-display font-bold text-card text-lg leading-tight uppercase">{c.name}</h3>
@@ -403,7 +462,7 @@ const Index = () => {
                 <div className="group bg-card rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-border/50">
                   <div className="relative overflow-hidden aspect-4/3 p-4">
                     <div className="w-full h-full rounded-3xl overflow-hidden relative">
-                      <img src={p.image} alt={p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                      <img src={p.image} alt={p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" onError={(e) => { (e.currentTarget as HTMLImageElement).src = defaultLogo; }} />
                       <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     </div>
                     <span className="absolute top-8 left-8 text-[10px] font-black uppercase tracking-widest bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm">

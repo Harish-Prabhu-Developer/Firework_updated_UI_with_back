@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index.js';
 import { users, userSessions, roles } from '../db/schema/users.js';
+import { fcmTokens, devicePlatformEnum } from '../db/schema/fcmTokens.js';
 import { eq, or } from 'drizzle-orm';
 import { generateAccessToken, generateRefreshToken, TokenPayload } from '../utils/jwt.js';
 
@@ -64,10 +65,19 @@ export const login = async (req: Request, res: Response) => {
         await db.insert(userSessions).values({
             userId: user.id,
             refreshToken,
-            fcmToken: fcmToken || null,
-            fcmPlatform: fcmPlatform || null,
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
+
+        if (fcmToken) {
+            await db.insert(fcmTokens).values({
+                userId: user.id,
+                fcmToken,
+                platform: (fcmPlatform as 'android' | 'ios' | 'web') || 'web',
+            }).onConflictDoUpdate({
+                target: fcmTokens.fcmToken,
+                set: { updatedAt: new Date() },
+            });
+        }
 
         res.json({
             success: true,
@@ -132,28 +142,17 @@ export const updateFcmToken = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, msg: 'FCM token required' });
         }
 
-        if (refreshToken) {
-            // Update by refreshToken (original behaviour)
-            await db.update(userSessions)
-                .set({ fcmToken: fcmToken || null, fcmPlatform: fcmPlatform || null })
-                .where(eq(userSessions.refreshToken, refreshToken));
-        } else if (req.user?.id) {
-            // Fallback: find the most recent session for this user and update it
-            const sessions = await db.select()
-                .from(userSessions)
-                .where(eq(userSessions.userId, req.user.id))
-                .orderBy(userSessions.createdAt)
-                .limit(1);
-
-            if (sessions.length > 0) {
-                await db.update(userSessions)
-                    .set({ fcmToken, fcmPlatform: fcmPlatform || null })
-                    .where(eq(userSessions.id, sessions[0].id));
-            } else {
-                return res.status(404).json({ success: false, msg: 'No active session found' });
-            }
+        if (req.user?.id) {
+            await db.insert(fcmTokens).values({
+                userId: req.user.id,
+                fcmToken,
+                platform: (fcmPlatform as 'android' | 'ios' | 'web') || 'web',
+            }).onConflictDoUpdate({
+                target: fcmTokens.fcmToken,
+                set: { updatedAt: new Date() },
+            });
         } else {
-            return res.status(400).json({ success: false, msg: 'Refresh token or authentication required' });
+            return res.status(400).json({ success: false, msg: 'Authentication required' });
         }
             
         res.json({ success: true, msg: 'FCM token updated successfully' });

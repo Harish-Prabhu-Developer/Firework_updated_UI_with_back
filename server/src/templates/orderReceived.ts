@@ -1,5 +1,4 @@
 
-
 interface OrderItem {
   productName: string;
   content?: string;
@@ -18,7 +17,6 @@ interface OrderReceivedData {
   discountPercentage?: number;
   total: string;
   items: OrderItem[];
-  logoUrl?: string;
 }
 
 const formatCurrency = (value: number | string) =>
@@ -44,36 +42,32 @@ export const OrderReceivedTemplate = (data: OrderReceivedData): string => `
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <title>Crackers Kingdom</title>
 <style>
-body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; color:#1A1A1A; }
+body { margin:0; background:#F7F4EF; font-family:Arial, sans-serif; color:#1A1A1A; }
 .container { width:600px; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.08); }
-.heading { font-family:'Playfair Display', serif; }
-.primary { color:#D4A017; }
-.button { background:#D4A017; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:600; display:inline-block; }
 .footer { background:#1A1A1A; color:#B8B8B8; font-size:12px; }
 </style>
 </head>
 
 <body>
 
-<table width="100%" bgcolor="#F7F4EF">
+<table width="100%" bgcolor="#F7F4EF" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td align="center" style="padding:40px 10px">
 
-<table class="container">
+<table class="container" cellpadding="0" cellspacing="0" border="0">
 
 <!-- HEADER -->
 <tr>
 <td align="center" style="background:#D4A017;padding:30px">
-  <div style="background:#000000;padding:12px 20px;border-radius:8px;display:inline-block">
-    <img src="${data.logoUrl}" width="140" alt="Crackers Kingdom Logo" style="display:block">
+  <div style="background:#000000;padding:14px 24px;border-radius:8px;display:inline-block">
+    <span style="color:#D4A017;font-size:32px;font-weight:900;font-family:Arial,Helvetica,sans-serif;letter-spacing:4px;line-height:1">CK</span>
   </div>
-  <h1 class="heading" style="color:#ffffff;margin-top:14px;font-size:26px;font-weight:700;font-family:Arial,Helvetica,sans-serif">
+  <h1 style="color:#ffffff;margin-top:14px;font-size:26px;font-weight:700;font-family:Arial,Helvetica,sans-serif;margin-bottom:4px">
     Crackers Kingdom
   </h1>
-  <p style="color:#fff7e2;font-size:14px;margin-top:6px;font-family:Arial,Helvetica,sans-serif">
+  <p style="color:#fff7e2;font-size:14px;margin-top:6px;font-family:Arial,Helvetica,sans-serif;margin-bottom:0">
     Premium Sivakasi Crackers Shop
   </p>
 </td>
@@ -82,30 +76,32 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 <!-- MESSAGE -->
 <tr>
 <td style="padding:35px">
-  <p style="font-size:14px;color:#D4A017;font-weight:600;margin-bottom:6px">
+  <p style="font-size:14px;color:#D4A017;font-weight:600;margin-bottom:6px;margin-top:0">
     Order Enquiry Received
   </p>
-  <h2 class="heading" style="font-size:22px;margin-bottom:12px">
+  <h2 style="font-size:22px;margin-bottom:12px;margin-top:0;font-family:Arial,Helvetica,sans-serif">
     Thank you for choosing Crackers Kingdom
   </h2>
-  <p style="color:#6B6B6B;font-size:15px;line-height:1.6">
+  <p style="color:#6B6B6B;font-size:15px;line-height:1.6;margin:0">
     Your estimate request has been successfully received by <strong>Crackers Kingdom</strong>.
     Our team will review your enquiry and contact you shortly to confirm the order details and delivery information.
   </p>
 </td>
 </tr>
 
-<!-- SHOP IMAGE -->
+<!-- INTRO CARD -->
 <tr>
 <td style="padding:0 35px 30px 35px">
-  <table width="100%" style="background:#F7F4EF;border-radius:14px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F4EF;border-radius:14px">
     <tr>
-      <td width="40%" style="padding:10px" align="center">
-        <div style="width:180px;height:180px;border-radius:999px;padding:3px;background:linear-gradient(135deg,#D4A017,#E7C561,#D4A017);box-shadow:0 0 0 4px rgba(212,160,23,0.18),0 0 26px rgba(212,160,23,0.55);display:inline-block"><div style="width:100%;height:100%;border-radius:999px;background:#111111;border:1px solid rgba(255,255,255,0.2);overflow:hidden"><img src="${data.logoUrl}" width="100%" alt="Crackers Kingdom Logo" style="display:block;width:100%;height:100%;object-fit:contain;padding:8px;border-radius:999px"></div></div>
+      <td width="40%" style="padding:20px" align="center">
+        <div style="width:120px;height:120px;border-radius:50%;background:#D4A017;display:inline-block;text-align:center;line-height:120px">
+          <span style="color:#000000;font-size:36px;font-weight:900;font-family:Arial,Helvetica,sans-serif;letter-spacing:3px;line-height:120px">CK</span>
+        </div>
       </td>
       <td width="60%" style="padding:20px">
-        <h3 class="heading primary" style="margin:0 0 8px 0">Enquiry Received</h3>
-        <p style="font-size:14px;color:#6B6B6B;line-height:1.6">
+        <h3 style="margin:0 0 8px 0;color:#D4A017;font-family:Arial,Helvetica,sans-serif">Enquiry Received</h3>
+        <p style="font-size:14px;color:#6B6B6B;line-height:1.6;margin:0">
           Our team will verify your estimate and reach you within <strong>2 hours</strong> to confirm availability, pricing, and delivery options.
         </p>
       </td>
@@ -117,7 +113,7 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 <!-- ORDER DETAILS -->
 <tr>
 <td style="padding:0 35px 30px 35px">
-  <table width="100%" style="border:1px solid #EEE;border-radius:12px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #EEE;border-radius:12px">
     <tr>
       <td style="padding:16px;font-size:14px;color:#444">
         <strong>Enquiry ID:</strong> ${data.orderNumber} <br><br>
@@ -133,14 +129,14 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 <!-- ESTIMATE SUMMARY -->
 <tr>
 <td style="padding:0 35px 25px 35px">
-  <h3 class="heading" style="font-size:20px;margin-bottom:15px">Estimate Summary</h3>
-  <table width="100%" style="border-collapse:collapse">
+  <h3 style="font-size:20px;margin-bottom:15px;margin-top:0;font-family:Arial,Helvetica,sans-serif">Estimate Summary</h3>
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
     <tr style="background:#F7F4EF;font-size:13px">
       <th align="left" style="padding:10px">Product</th>
-      <th align="center">Content</th>
-      <th align="center">Qty</th>
-      <th align="right">Price</th>
-      <th align="right">Subtotal</th>
+      <th align="center" style="padding:10px">Content</th>
+      <th align="center" style="padding:10px">Qty</th>
+      <th align="right" style="padding:10px">Price</th>
+      <th align="right" style="padding:10px">Subtotal</th>
     </tr>
     ${buildProductRows(data.items)}
   </table>
@@ -150,26 +146,26 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 <!-- TOTAL -->
 <tr>
 <td style="padding:0 35px 30px 35px" align="right">
-  <table width="250" style="background:#F7F4EF;border-radius:12px">
+  <table width="250" cellpadding="0" cellspacing="0" border="0" style="background:#F7F4EF;border-radius:12px">
     <tr>
       <td style="padding:16px">
-        <table width="100%">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="font-size:14px">Net Total</td>
-            <td align="right">${data.subtotal}</td>
+            <td style="font-size:14px;padding-bottom:6px">Net Total</td>
+            <td align="right" style="font-size:14px;padding-bottom:6px">${data.subtotal}</td>
           </tr>
-          ${data.discountAmount && data.discountAmount !== '₹0' ? `
+          ${data.discountAmount && data.discountAmount !== '&#8377;0' ? `
           <tr>
-            <td style="padding-top:6px; color: #16a34a; font-weight: 500;">You Save</td>
-            <td align="right" style="padding-top:6px; color: #16a34a; font-weight: 500;">- ${data.discountAmount}</td>
+            <td style="padding-bottom:6px; color: #16a34a; font-weight: 500;">You Save</td>
+            <td align="right" style="padding-bottom:6px; color: #16a34a; font-weight: 500;">- ${data.discountAmount}</td>
           </tr>
           ` : ''}
           <tr>
-            <td style="padding-top:6px">Delivery</td>
-            <td align="right" style="padding-top:6px">To be confirmed</td>
+            <td style="padding-bottom:6px">Delivery</td>
+            <td align="right" style="padding-bottom:6px">To be confirmed</td>
           </tr>
           <tr>
-            <td colspan="2" style="padding-top:10px;border-top:1px dashed #DDD"></td>
+            <td colspan="2" style="padding-top:4px;border-top:1px dashed #DDD;font-size:1px">&nbsp;</td>
           </tr>
           <tr>
             <td style="font-weight:700;padding-top:10px">Overall Total</td>
@@ -184,14 +180,14 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 </td>
 </tr>
 
-<!-- SUMMARY NOTICE -->
+<!-- NOTICE -->
 <tr>
 <td style="padding:0 35px 30px 35px">
-  <table width="100%" style="background:#FFF8E3;border-radius:12px">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFF8E3;border-radius:12px">
     <tr>
       <td style="padding:16px">
         <p style="font-weight:600;margin:0 0 6px 0">Estimate Summary Included</p>
-        <p style="font-size:13px;color:#6B6B6B;line-height:1.6">
+        <p style="font-size:13px;color:#6B6B6B;line-height:1.6;margin:0">
           Your estimate summary is included in this email for quick reference.
         </p>
       </td>
@@ -213,7 +209,7 @@ body { margin:0; background:#F7F4EF; font-family:'DM Sans', Arial, sans-serif; c
 
 <!-- FOOTER -->
 <tr>
-<td class="footer" align="center" style="padding:25px">
+<td class="footer" align="center" style="padding:25px;background:#1A1A1A;color:#B8B8B8;font-size:12px">
   &copy; 2026 Crackers Kingdom<br>
   Premium Sivakasi Crackers Shop
   <br><br>

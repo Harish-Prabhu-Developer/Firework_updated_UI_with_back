@@ -171,8 +171,7 @@ export const createOrder = async (req: Request, res: Response) => {
                             quantity: Number(item.quantity || 0),
                             unitPrice: Number(item.unitPrice || 0),
                             totalPrice: Number(item.totalPrice || 0),
-                        })),
-                        logoUrl: `${process.env.BASE_URL || `https://${req.get('host')}`}/assets/logo.png`
+                        }))
                     };
 
                     await sendOrderReceivedEmail(customerEmail, emailData, [

@@ -1,0 +1,21 @@
+{
+  "name": "Crackers Kingdom — Premium Sivakasi Fireworks",
+  "short_name": "Crackers Kingdom",
+  "description": "Crackers Kingdom (crackerskingdom.in) — your trusted destination for premium Sivakasi fireworks. Estimate online, confirm in 2 hours, legal parcel dispatch across India.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#d4a629",
+  "background_color": "#0a0a0a",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["shopping", "business"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

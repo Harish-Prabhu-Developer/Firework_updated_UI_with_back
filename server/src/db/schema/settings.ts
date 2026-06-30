@@ -1,3 +1,4 @@
+// server/src/db/schema/settings.ts
 import {
   pgTable,
   uuid,
@@ -24,7 +25,6 @@ export const settings = pgTable("settings", {
   }),
   salesStatus: boolean("sales_status").notNull().default(true),
   orderReceiptQrStatus: boolean("order_receipt_qr_status").notNull().default(true),
-  invoiceQrStatus: boolean("invoice_qr_status").notNull().default(true),
   siteDiscount: numeric("site_discount", { precision: 5, scale: 2 }).default("0"),
   shopWebsite: varchar("shop_website", { length: 255 }).default("www.crackerskingdom.in"),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),

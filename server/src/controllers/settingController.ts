@@ -19,13 +19,13 @@ export const updateSettings = async (req: Request, res: Response) => {
         const { 
             shopName, shopPhone, shopAddress, shopGst, 
             shopEmail, minimumOrder, whatsappNum, socialMedias,
-            salesStatus, orderReceiptQrStatus, invoiceQrStatus, siteDiscount
+            salesStatus, orderReceiptQrStatus, siteDiscount
         } = req.body;
         const existing = await db.select().from(settings).limit(1);
         const settingsData = {
             shopName, shopPhone, shopAddress, shopGst,
             shopEmail, minimumOrder, whatsappNum, socialMedias,
-            salesStatus, orderReceiptQrStatus, invoiceQrStatus,
+            salesStatus, orderReceiptQrStatus,
             siteDiscount: siteDiscount !== undefined ? siteDiscount.toString() : "0",
             updatedAt: new Date()
         };
@@ -38,7 +38,6 @@ export const updateSettings = async (req: Request, res: Response) => {
                 existing[0].shopPhone !== shopPhone ||
                 existing[0].shopAddress !== shopAddress ||
                 existing[0].shopGst !== shopGst ||
-                existing[0].invoiceQrStatus !== invoiceQrStatus ||
                 existing[0].orderReceiptQrStatus !== orderReceiptQrStatus;
 
             result = await db.update(settings)

@@ -6,6 +6,7 @@ import { Fonts, Radius } from '../styles/globalStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfileModal } from './modals/UserProfileModal';
+import { NotificationModal } from './modals/NotificationModal';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface HeaderBarProps {
@@ -18,6 +19,7 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
   const insets = useSafeAreaInsets();
   const [userName, setUserName] = useState('Admin User');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const { unreadCount } = useNotification();
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
       </View>
 
       <View style={styles.right}>
-        <Pressable style={styles.iconButton}>
+        <Pressable style={styles.iconButton} onPress={() => setNotificationOpen(true)}>
           <Bell size={20} color={colors.foreground} />
           {unreadCount > 0 && (
             <View style={styles.badgeContainer}>
@@ -73,6 +75,11 @@ export const HeaderBar = ({ title, isDesktop, onMenuPress }: HeaderBarProps) => 
             }
           });
         }} 
+      />
+
+      <NotificationModal 
+        open={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
       />
     </View>
   );

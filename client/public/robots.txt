@@ -1,4 +1,20 @@
+# Crackers Kingdom — crackerskingdom.in
+# Robots.txt — SEO directives
+
+User-agent: Googlebot
+Allow: /
+Disallow: /checkout
+
+User-agent: Bingbot
+Allow: /
+Disallow: /checkout
+
 User-agent: *
 Allow: /
+Disallow: /checkout
 
+# Sitemap
 Sitemap: https://crackerskingdom.in/sitemap.xml
+
+# Host
+Host: https://crackerskingdom.in

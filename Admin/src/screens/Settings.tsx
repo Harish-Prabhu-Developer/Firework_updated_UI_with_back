@@ -7,7 +7,7 @@ import { useActionPermissions } from '../hooks/usePermissions';
 import api from '../api/api';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { Save, Settings2, Share2, ShoppingBag, Globe, MessageSquare } from 'lucide-react-native';
+import { Save, Settings2, Share2, ShoppingBag, Globe } from 'lucide-react-native';
 import { LightColors as colors } from '../styles/colors';
 import { globalStyles, Radius, Fonts } from '../styles/globalStyles';
 import { formatIdentityDisplay, cleanIdentityInput } from '../utils/Formatter';
@@ -27,7 +27,6 @@ interface ShopSettings {
   };
   salesStatus: boolean;
   orderReceiptQrStatus: boolean;
-  invoiceQrStatus: boolean;
   siteDiscount: string;
 }
 
@@ -63,7 +62,6 @@ export default function Settings() {
     socialMedias: { instagram: '', facebook: '' },
     salesStatus: true,
     orderReceiptQrStatus: true,
-    invoiceQrStatus: true,
     siteDiscount: '0'
   });
 
@@ -80,7 +78,6 @@ export default function Settings() {
         socialMedias: settings.socialMedias ?? { instagram: '', facebook: '' },
         salesStatus: settings.salesStatus ?? true,
         orderReceiptQrStatus: settings.orderReceiptQrStatus ?? true,
-        invoiceQrStatus: settings.invoiceQrStatus ?? true,
         siteDiscount: settings.siteDiscount ?? '0'
       });
     }
@@ -169,18 +166,6 @@ export default function Settings() {
                     trackColor={{ false: colors.border, true: colors.primary }}
                   />
                 </View>
-
-                <View className="flex-row items-center justify-between pt-3 border-t border-border/50">
-                  <View className="flex-1 mr-4">
-                    <Text style={{ fontFamily: Fonts.display }} className="text-sm font-bold text-foreground">Invoice QR</Text>
-                    <Text className="text-xs text-muted-foreground">Show QR code on tax invoices</Text>
-                  </View>
-                  <Switch
-                    value={form.invoiceQrStatus}
-                    onValueChange={v => setForm({ ...form, invoiceQrStatus: v })}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                  />
-                </View>
               </View>
             </Card>
 
@@ -251,4 +236,3 @@ export default function Settings() {
     </MasterScreenLayout>
   );
 }
-

@@ -74,19 +74,31 @@ const howItWorks = [
 const contactStructuredData = {
   "@context": "https://schema.org",
   "@type": "ContactPage",
-  name: "Contact Crackers Kingdom",
+  name: "Contact Crackers Kingdom — Fireworks Enquiry & Bulk Orders",
   description:
-    "Contact Crackers Kingdom for estimate support, bulk order enquiries, and parcel dispatch assistance. Based in Sivakasi, serving customers across India.",
+    "Contact Crackers Kingdom (crackerskingdom.in) for estimate support, bulk order enquiries, and parcel dispatch assistance. Based in Sivakasi, serving customers across India.",
   url: "https://crackerskingdom.in/contact",
   inLanguage: "en-IN",
+  isPartOf: {
+    "@type": "WebSite",
+    "@id": "https://crackerskingdom.in/#website",
+  },
   mainEntity: {
     "@type": "Organization",
+    "@id": "https://crackerskingdom.in/#organization",
     name: "Crackers Kingdom",
     contactPoint: [
       {
         "@type": "ContactPoint",
-        telephone: "+91 81442 71571",
+        telephone: "+91-81442-71571",
         contactType: "customer support",
+        areaServed: "IN",
+        availableLanguage: ["English", "Tamil", "Hindi"],
+      },
+      {
+        "@type": "ContactPoint",
+        telephone: "+91-950-021-1527",
+        contactType: "sales",
         areaServed: "IN",
         availableLanguage: ["English", "Tamil"],
       },
@@ -126,10 +138,10 @@ const Contact = () => {
   return (
     <div>
       <SEO
-        title="Contact Crackers Kingdom | Fireworks Enquiry and Bulk Orders"
-        description="Contact Crackers Kingdom for estimate support, bulk order enquiries, and parcel dispatch assistance. Based in Sivakasi, serving customers across India."
+        title="Contact Crackers Kingdom | Fireworks Enquiry & Bulk Orders — crackerskingdom.in"
+        description="Contact Crackers Kingdom (crackerskingdom.in) for estimate support, bulk order enquiries, and parcel dispatch assistance. Based in Sivakasi, serving customers across India. Call +91 81442 71571."
         canonical="/contact"
-        keywords="contact crackers kingdom, fireworks enquiry, bulk crackers order, sivakasi fireworks contact"
+        keywords="contact crackers kingdom, fireworks enquiry, bulk crackers order, sivakasi fireworks contact, crackers kingdom phone number, crackers kingdom address"
         ogImage="/og/contact-og.svg?v=2"
         structuredData={contactStructuredData}
       />

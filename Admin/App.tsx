@@ -1,5 +1,5 @@
 // App.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Platform, View, ActivityIndicator, Text } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -19,7 +19,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ToastProvider } from './src/hooks/useToast';
 import { navigationRef } from './src/navigation/NavigationService';
 import { PaginationPortalProvider } from './src/components/common/PaginationPortal';
-import { NotificationProvider, useNotification } from './src/contexts/NotificationContext';
+import { NotificationProvider } from './src/contexts/NotificationContext';
+import { registerForPushNotifications } from './src/services/pushNotifications';
 import Login from './src/screens/Login';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ShieldCheck } from 'lucide-react-native';
@@ -188,12 +189,31 @@ const RootNavigator = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Request notification permissions after mounting and knowing user is logged in
-  const { requestPermissionAndRegister } = useNotification();
+  // Update loggedIn when navigating to Main (e.g., after login from Login screen)
+  const hasNavigatedToMain = useRef(false);
   useEffect(() => {
-      if (loggedIn) {
-          requestPermissionAndRegister();
+    const unsubscribe = navigationRef.current?.addListener('state', () => {
+      const state = navigationRef.current?.getState();
+      const rootRouteName = state?.routes?.[state.index]?.name;
+      if (rootRouteName === 'Main') {
+        if (!hasNavigatedToMain.current) {
+          hasNavigatedToMain.current = true;
+          AsyncStorage.getItem('accessToken').then(token => {
+            if (token) setLoggedIn(true);
+          });
+        }
+      } else {
+        hasNavigatedToMain.current = false;
       }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Register for push notifications once when the user is logged in
+  useEffect(() => {
+    if (loggedIn) {
+      registerForPushNotifications();
+    }
   }, [loggedIn]);
 
   if (checking) return <SplashScreen />;

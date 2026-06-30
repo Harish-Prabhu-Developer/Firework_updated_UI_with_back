@@ -1,3 +1,4 @@
+// Admin/src/lib/firebaseConfig.web.ts
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
@@ -16,17 +17,12 @@ const firebaseConfig = {
 // ── Web Push VAPID Key ──
 // Generate this in Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
 // Click "Generate key pair" and paste the public key here
-export const VAPID_KEY = '';
+export const VAPID_KEY = 'PASTE_YOUR_VAPID_PUBLIC_KEY';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 let analytics: any = null;
 
-isSupported().then(yes => {
-  if (yes) {
-    analytics = getAnalytics(app);
-  }
-}).catch(() => {});
+isSupported().then(yes => { if (yes) analytics = getAnalytics(app); }).catch(() => { });
 
 export { app, analytics };
-

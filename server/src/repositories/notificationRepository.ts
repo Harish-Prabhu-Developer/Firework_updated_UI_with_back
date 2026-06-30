@@ -1,7 +1,8 @@
+// server/src/repositories/notificationRepository.ts
 import { db } from '../db/index.js';
 import { notifications } from '../db/schema/notifications.js';
-import { userSessions } from '../db/schema/users.js';
-import { eq, and, isNotNull } from 'drizzle-orm';
+import { fcmTokens, devicePlatformEnum } from '../db/schema/fcmTokens.js';
+import { eq, and, lt } from 'drizzle-orm';
 
 export const createNotification = async (payload: {
     userId: string;
@@ -23,6 +24,13 @@ export const getUserNotifications = async (userId: string, limit = 50) => {
     });
 };
 
+export const deleteOldNotifications = async (days = 5) => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    await db.delete(notifications).where(lt(notifications.createdAt, cutoffDate));
+};
+
 export const markNotificationAsRead = async (notificationId: string, userId: string) => {
     return await db.update(notifications)
         .set({ isRead: true, readAt: new Date() })
@@ -35,18 +43,36 @@ export const markAllNotificationsAsRead = async (userId: string) => {
         .where(eq(notifications.userId, userId));
 };
 
-export const getUserDeviceTokens = async (userId: string) => {
-    const sessions = await db.query.userSessions.findMany({
-        where: and(
-            eq(userSessions.userId, userId),
-            isNotNull(userSessions.fcmToken)
-        )
-    });
-    return sessions.map(s => s.fcmToken as string);
+/**
+ * Upsert by fcmToken — a device re-registering (token unchanged) updates its
+ * row in place; a token that moved to a different logged-in user gets
+ * reassigned rather than duplicated.
+ */
+export const upsertFcmToken = async (
+    userId: string,
+    fcmToken: string,
+    platform: (typeof devicePlatformEnum.enumValues)[number]
+) => {
+    const [token] = await db
+        .insert(fcmTokens)
+        .values({ userId, fcmToken, platform })
+        .onConflictDoUpdate({
+            target: fcmTokens.fcmToken,
+            set: { userId, platform, updatedAt: new Date() },
+        })
+        .returning();
+    return token;
 };
 
+
+export const getUserDeviceTokens = async (userId: string) => {
+    const rows = await db
+        .select({ fcmToken: fcmTokens.fcmToken })
+        .from(fcmTokens)
+        .where(eq(fcmTokens.userId, userId));
+
+    return rows.map((r) => r.fcmToken);
+};
 export const removeInvalidToken = async (fcmToken: string) => {
-    await db.update(userSessions)
-        .set({ fcmToken: null, fcmPlatform: null })
-        .where(eq(userSessions.fcmToken, fcmToken));
+    await db.delete(fcmTokens).where(eq(fcmTokens.fcmToken, fcmToken));
 };

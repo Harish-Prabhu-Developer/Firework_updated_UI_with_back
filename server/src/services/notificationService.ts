@@ -1,10 +1,11 @@
+// server/src/services/notificationService.ts
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { db } from '../db/index.js';
-import { 
-    createNotification, 
-    getUserDeviceTokens, 
-    removeInvalidToken 
+import {
+    createNotification,
+    getUserDeviceTokens,
+    removeInvalidToken
 } from '../repositories/notificationRepository.js';
 
 // Avoid re-initializing if already initialized
@@ -19,7 +20,7 @@ if (!getApps().length) {
 }
 
 export const sendToUser = async (
-    userId: string, 
+    userId: string,
     payload: { title: string; message: string; type: string; referenceId?: string; referenceType?: string; screen?: string; route?: string; status?: string; orderNumber?: string; rejectionReason?: string; }
 ) => {
     try {
@@ -58,13 +59,13 @@ export const sendToUser = async (
 
         // 4. Send via Firebase Admin
         const response = await getMessaging().sendEachForMulticast(message);
-        
+
         // 5. Clean up invalid tokens
         if (response.failureCount > 0) {
             response.responses.forEach((res: any, idx: number) => {
                 if (!res.success) {
                     const errorCode = res.error?.code;
-                    if (errorCode === 'messaging/invalid-registration-token' || 
+                    if (errorCode === 'messaging/invalid-registration-token' ||
                         errorCode === 'messaging/registration-token-not-registered') {
                         // Remove token from DB
                         removeInvalidToken(tokens[idx]).catch(e => console.error(e));
@@ -88,9 +89,9 @@ export const sendToRole = async (
         const allUsers = await db.query.users.findMany({
             with: { role: true }
         });
-        
+
         const targetUsers = allUsers.filter(u => u.role?.name?.toLowerCase() === roleName.toLowerCase());
-        
+
         const results = [];
         for (const user of targetUsers) {
             results.push(await sendToUser(user.id, payload));
@@ -105,7 +106,7 @@ export const sendToAllUsers = async (
 ) => {
     try {
         const allUsers = await db.query.users.findMany();
-        
+
         const results = [];
         for (const user of allUsers) {
             results.push(await sendToUser(user.id, payload));

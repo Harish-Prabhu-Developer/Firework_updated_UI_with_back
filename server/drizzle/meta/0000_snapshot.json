@@ -1,5 +1,5 @@
 {
-  "id": "f9f7b768-9d27-4b40-9349-598748e380f1",
+  "id": "82d3cfb8-099d-4ee5-b669-1fed6277028f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -423,6 +423,97 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.fcm_tokens": {
+      "name": "fcm_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fcm_token": {
+          "name": "fcm_token",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "device_platform",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fcm_tokens_user_id_idx": {
+          "name": "fcm_tokens_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fcm_tokens_user_id_users_id_fk": {
+          "name": "fcm_tokens_user_id_users_id_fk",
+          "tableFrom": "fcm_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fcm_tokens_fcm_token_unique": {
+          "name": "fcm_tokens_fcm_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "fcm_token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.modules": {
       "name": "modules",
       "schema": "",
@@ -702,18 +793,6 @@
           "type": "varchar(500)",
           "primaryKey": false,
           "notNull": true
-        },
-        "fcm_token": {
-          "name": "fcm_token",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fcm_platform": {
-          "name": "fcm_platform",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
         },
         "device_info": {
           "name": "device_info",
@@ -1748,13 +1827,6 @@
           "notNull": true,
           "default": true
         },
-        "invoice_qr_status": {
-          "name": "invoice_qr_status",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "site_discount": {
           "name": "site_discount",
           "type": "numeric(5, 2)",
@@ -1877,6 +1949,15 @@
     }
   },
   "enums": {
+    "public.device_platform": {
+      "name": "device_platform",
+      "schema": "public",
+      "values": [
+        "android",
+        "ios",
+        "web"
+      ]
+    },
     "public.gst_type": {
       "name": "gst_type",
       "schema": "public",

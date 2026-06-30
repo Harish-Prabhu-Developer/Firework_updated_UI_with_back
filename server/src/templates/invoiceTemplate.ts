@@ -101,27 +101,6 @@ function renderTaxRows(input: InvoiceInput, totals: InvoiceComputedTotals): stri
           <tr class="tax-row"><td>SGST @ ${input.tax.sgstPercent || 0}%</td><td class="r">${formatInr(totals.sgstAmount)}</td></tr>`;
 }
 
-const DEFAULT_PLACEHOLDER_QR = (label: string) => `
-            <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-              <rect width="80" height="80" fill="white"/>
-              <rect x="6" y="6" width="26" height="26" rx="2" fill="none" stroke="#999" stroke-width="2.5"/>
-              <rect x="48" y="6" width="26" height="26" rx="2" fill="none" stroke="#999" stroke-width="2.5"/>
-              <rect x="6" y="48" width="26" height="26" rx="2" fill="none" stroke="#999" stroke-width="2.5"/>
-              <text x="40" y="44" font-size="8" text-anchor="middle" fill="#999" font-family="sans-serif">${escapeHtml(label)}</text>
-            </svg>`;
-
-function renderQrBlock(label: string, sublabel: string, dataUrl?: string): string {
-  const content = dataUrl && dataUrl !== 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    ? `<img src="${dataUrl}" alt="${escapeHtml(label)}" style="width:80px;height:80px;display:block;" />`
-    : DEFAULT_PLACEHOLDER_QR(label);
-  return `
-        <div class="qr-block">
-          <div class="qr-label">${escapeHtml(label)}</div>
-          <div class="qr-box">${content}</div>
-          <div class="qr-sublabel">${escapeHtml(sublabel)}</div>
-        </div>`;
-}
-
 /**
  * Renders the full invoice as a standalone HTML string, ready to be
  * passed to Puppeteer's page.setContent().
@@ -178,13 +157,6 @@ export function renderInvoiceHtml(input: InvoiceInput): string {
   .inv-page{background:#fff;border:0.5px solid #d0cfc8;border-radius:12px;overflow:hidden;position:relative}
   .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;height:420px;background-image:url('${logo}');background-size:contain;background-repeat:no-repeat;background-position:center;opacity:${watermarkOpacity};pointer-events:none;z-index:0}
   .inv-page>*:not(.watermark){position:relative;z-index:1}
-  .qr-bar{display:flex;justify-content:space-between;align-items:center;background:#f8f8f4;border-bottom:0.5px solid #e4e3dc;padding:16px 24px;gap:12px}
-  .qr-bar-note{font-size:11px;color:#888780;flex:1}
-  .qr-pair{display:flex;gap:32px}
-  .qr-block{display:flex;flex-direction:column;align-items:center;gap:6px}
-  .qr-label{font-size:11px;font-weight:500;color:#5f5e5a;text-transform:uppercase;letter-spacing:.06em}
-  .qr-sublabel{font-size:10px;color:#888780}
-  .qr-box{width:80px;height:80px;border:0.5px solid #d0cfc8;border-radius:6px;overflow:hidden;background:#fff}
   .header-band{display:flex;justify-content:space-between;align-items:center;padding:18px 24px 16px;border-bottom:2px solid ${accent};background:linear-gradient(to right,#fffdf5,#fff)}
   .header-left{display:flex;align-items:center;gap:14px}
   .logo-img{width:70px;height:70px;border-radius:50%;object-fit:cover;flex-shrink:0}
@@ -251,11 +223,6 @@ export function renderInvoiceHtml(input: InvoiceInput): string {
 <div class="inv-wrap">
   <div class="inv-page">
     <div class="watermark" aria-hidden="true"></div>
-
-    <div class="qr-bar">
-      <div class="qr-bar-note">Scan QR codes for payment or to verify this invoice</div>
-      <div class="qr-pair">${renderQrBlock('Scan to Pay', 'UPI / Bank Transfer', input.qr?.paymentQrDataUrl)}${renderQrBlock('Invoice QR', 'Verify on GST Portal', input.qr?.invoiceQrDataUrl)}</div>
-    </div>
 
     <div class="header-band">
       <div class="header-left">

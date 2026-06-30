@@ -19,10 +19,10 @@ const SHOP_DETAILS = {
 
 const resolveLogoDataUrl = () => {
     const candidatePaths = [
-        path.resolve(__dirname, '../../assets/logo.png'),
-        path.resolve(__dirname, '../../../src/assets/logo.png'),
-        path.resolve(process.cwd(), 'src/assets/logo.png'),
-        path.resolve(process.cwd(), 'server/src/assets/logo.png'),
+        path.resolve(__dirname, '../../assets/logo.svg'),
+        path.resolve(__dirname, '../../../src/assets/logo.svg'),
+        path.resolve(process.cwd(), 'src/assets/logo.svg'),
+        path.resolve(process.cwd(), 'server/src/assets/logo.svg'),
     ];
 
     const logoPath = candidatePaths.find((candidate) => fs.existsSync(candidate));
@@ -31,7 +31,7 @@ const resolveLogoDataUrl = () => {
     }
 
     const imageBuffer = fs.readFileSync(logoPath);
-    return `data:image/png;base64,${imageBuffer.toString('base64')}`;
+    return `data:image/svg+xml;base64,${imageBuffer.toString('base64')}`;
 };
 
 const logoDataUrl = resolveLogoDataUrl();

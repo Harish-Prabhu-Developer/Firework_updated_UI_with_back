@@ -12,6 +12,7 @@ const CONTAINER_ID = 'qr-reader-web-shim';
 export const Camera = ({ style, onReadCode, scanBarcode }) => {
   const [status, setStatus] = useState('init'); // 'init' | 'ready' | 'error'
   const scannerRef = useRef(null);
+  const startedRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -26,11 +27,6 @@ export const Camera = ({ style, onReadCode, scanBarcode }) => {
         const { Html5Qrcode } = await import('html5-qrcode');
         if (!mountedRef.current) return;
 
-        // Clean up any leftover instance
-        if (scannerRef.current) {
-          try { await scannerRef.current.stop(); } catch (_) { }
-        }
-
         scannerRef.current = new Html5Qrcode(CONTAINER_ID);
 
         await scannerRef.current.start(
@@ -44,6 +40,7 @@ export const Camera = ({ style, onReadCode, scanBarcode }) => {
           () => { /* ignore verbose QR errors */ }
         );
 
+        startedRef.current = true;
         if (mountedRef.current) setStatus('ready');
       } catch (err) {
         console.error('[CameraKit Web Shim]', err);
@@ -55,10 +52,12 @@ export const Camera = ({ style, onReadCode, scanBarcode }) => {
 
     return () => {
       mountedRef.current = false;
-      if (scannerRef.current) {
+      if (scannerRef.current && startedRef.current) {
         scannerRef.current.stop().catch(() => { }).finally(() => {
           scannerRef.current = null;
         });
+      } else {
+        scannerRef.current = null;
       }
     };
   }, []);

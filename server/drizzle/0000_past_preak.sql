@@ -1,3 +1,4 @@
+CREATE TYPE "public"."device_platform" AS ENUM('android', 'ios', 'web');--> statement-breakpoint
 CREATE TYPE "public"."gst_type" AS ENUM('INSIDE_TN', 'OUTSIDE_TN');--> statement-breakpoint
 CREATE TYPE "public"."order_status" AS ENUM('ESTIMATE_SUBMITTED', 'PENDING_VERIFICATION', 'REJECTED', 'CONFIRMED', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED', 'converted');--> statement-breakpoint
 CREATE TYPE "public"."payment_method" AS ENUM('cash', 'upi', 'card');--> statement-breakpoint
@@ -49,6 +50,16 @@ CREATE TABLE "videos" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "fcm_tokens" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"fcm_token" varchar(500) NOT NULL,
+	"platform" "device_platform" NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "fcm_tokens_fcm_token_unique" UNIQUE("fcm_token")
+);
+--> statement-breakpoint
 CREATE TABLE "modules" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(100) NOT NULL,
@@ -89,8 +100,6 @@ CREATE TABLE "user_sessions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"refresh_token" varchar(500) NOT NULL,
-	"fcm_token" varchar(500),
-	"fcm_platform" varchar(50),
 	"device_info" varchar(255),
 	"ip_address" varchar(50),
 	"expires_at" timestamp NOT NULL,
@@ -218,7 +227,6 @@ CREATE TABLE "settings" (
 	"social_medias" jsonb DEFAULT '{"instagram":"https://www.instagram.com/","facebook":"https://www.facebook.com/"}'::jsonb NOT NULL,
 	"sales_status" boolean DEFAULT true NOT NULL,
 	"order_receipt_qr_status" boolean DEFAULT true NOT NULL,
-	"invoice_qr_status" boolean DEFAULT true NOT NULL,
 	"site_discount" numeric(5, 2) DEFAULT '0',
 	"shop_website" varchar(255) DEFAULT 'www.crackerskingdom.in',
 	"updated_at" timestamp DEFAULT now() NOT NULL
@@ -239,6 +247,7 @@ CREATE TABLE "notifications" (
 --> statement-breakpoint
 ALTER TABLE "products" ADD CONSTRAINT "products_category_id_category_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."category"("id") ON DELETE restrict ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "videos" ADD CONSTRAINT "videos_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
+ALTER TABLE "fcm_tokens" ADD CONSTRAINT "fcm_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_module_id_modules_id_fk" FOREIGN KEY ("module_id") REFERENCES "public"."modules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_action_id_permission_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."permission_actions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -259,6 +268,7 @@ CREATE INDEX "products_category_id_idx" ON "products" USING btree ("category_id"
 CREATE INDEX "products_display_order_idx" ON "products" USING btree ("display_order");--> statement-breakpoint
 CREATE INDEX "products_status_idx" ON "products" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "videos_product_id_idx" ON "videos" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "fcm_tokens_user_id_idx" ON "fcm_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "customer_phone_idx" ON "customers" USING btree ("phone");--> statement-breakpoint
 CREATE INDEX "customer_email_idx" ON "customers" USING btree ("email");--> statement-breakpoint
 CREATE INDEX "invoice_number_idx" ON "invoices" USING btree ("invoice_number");--> statement-breakpoint

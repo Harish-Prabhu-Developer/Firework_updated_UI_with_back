@@ -292,6 +292,7 @@ export const bulkImportProducts = async (req: Request, res: Response) => {
             const image = (row.image ?? '').trim() || null;
 
             const isActive = (row.status ?? '').trim().toLowerCase() === 'active';
+            const productDiscount = row.productDiscount !== undefined && row.productDiscount.trim() !== '' ? row.productDiscount.trim() : '0';
 
             // Auto-generate product code if not provided or duplicate was detected
             const bulkCode = finalProductCode || `CK${nextProductCodeNum++}`;
@@ -310,6 +311,7 @@ export const bulkImportProducts = async (req: Request, res: Response) => {
                     unit: combinedUnit,
                     rank: nextRank++,
                     mrp: mrp.toString(),
+                    productDiscount,
                     isActive,
                 }).returning();
                 insertedProducts.push(inserted);

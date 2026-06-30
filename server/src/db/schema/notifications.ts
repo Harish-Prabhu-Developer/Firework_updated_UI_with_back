@@ -1,3 +1,4 @@
+// server/src/db/schema/notifications.ts
 import { pgTable, uuid, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 

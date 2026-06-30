@@ -11,7 +11,6 @@ import { decrypt, encrypt } from '../utils/crypto.js';
 import { generatePDFFromHTML } from '../services/pdfService.js';
 
 import { renderInvoiceHtml } from '../templates/InvoiceTemplate.js'
-import QRCode from 'qrcode';
 import dotenv from "dotenv";
 import {
     bodyToStringArray,
@@ -36,17 +35,6 @@ function getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
 }
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Helper: Generate QR Code
-───────────────────────────────────────────────────────────────────────────── */
-export const generateInvoiceQR = async (data: string): Promise<string> => {
-    try {
-        return await QRCode.toDataURL(data, { margin: 1, width: 250 });
-    } catch (e) {
-        return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-    }
-};
 
 /* ─────────────────────────────────────────────────────────────────────────────
    POST /invoices
@@ -351,18 +339,6 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
         const verificationUrl = `${baseUrl}/api/v1/invoices/pdf/${encryptedId}`;
         const templateId = req.query.template as string;
 
-        const emptyGif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-        let payQrCodeUrl = emptyGif;
-        let verifyQrCodeUrl = emptyGif;
-
-        const isQrEnabled = !!settingsRow[0]?.invoiceQrStatus;
-        if (isQrEnabled) {
-            const upiId = process.env.UPI_ID || 'merchant@upi';
-            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(settingsRow[0]?.shopName || 'CRACKERS KINGDOM')}&am=${parseFloat(invoiceData.totalAmount).toFixed(2)}&tn=${encodeURIComponent(`Invoice ${invoiceData.invoiceNumber}`)}&cu=INR`;
-            payQrCodeUrl = await generateInvoiceQR(upiString);
-            verifyQrCodeUrl = await generateInvoiceQR(verificationUrl);
-        }
-
         const s = settingsRow[0];
         const shopMapped = {
             name: s?.shopName || 'CRACKERS KINGDOM',
@@ -444,11 +420,7 @@ export const getInvoicePDF = async (req: Request, res: Response) => {
                 sgstPercent: invoiceData.sgstPercentage || 0,
                 igstPercent: invoiceData.igstPercentage || 0
             },
-            amountInWords: numberToWords(parseFloat(invoiceData.totalAmount)),
-            qr: {
-                paymentQrDataUrl: payQrCodeUrl === emptyGif ? undefined : payQrCodeUrl,
-                invoiceQrDataUrl: verifyQrCodeUrl === emptyGif ? undefined : verifyQrCodeUrl
-            }
+            amountInWords: numberToWords(parseFloat(invoiceData.totalAmount))
         });
         const pdf = await generatePDFFromHTML(html, `invoice_${invoiceData.id}`);
 

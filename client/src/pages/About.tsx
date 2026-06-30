@@ -97,21 +97,25 @@ const legalTickerItems = [
 const aboutStructuredData = {
   "@context": "https://schema.org",
   "@type": "AboutPage",
-  name: "About Crackers Kingdom",
+  name: "About Crackers Kingdom — Sivakasi Fireworks Brand Story",
   description:
-    "Learn about Crackers Kingdom, our Sivakasi roots, licensed operations, safety-first values, and commitment to legal fireworks dispatch across India.",
+    "Learn about Crackers Kingdom (crackerskingdom.in), our Sivakasi roots, licensed operations under M/S NANDHINI TRADERS, safety-first values, and commitment to legal fireworks dispatch across India.",
   url: "https://crackerskingdom.in/about",
   inLanguage: "en-IN",
+  isPartOf: {
+    "@type": "WebSite",
+    "@id": "https://crackerskingdom.in/#website",
+  },
 };
 
 const About = () => {
   return (
     <div>
       <SEO
-        title="About Crackers Kingdom | Sivakasi Fireworks Brand Story"
-        description="Learn about Crackers Kingdom, our Sivakasi roots, licensed operations, safety-first values, and commitment to legal fireworks dispatch across India."
+        title="About Crackers Kingdom | Sivakasi Fireworks Brand Story — crackerskingdom.in"
+        description="Learn about Crackers Kingdom (crackerskingdom.in), our Sivakasi roots, licensed operations under M/S NANDHINI TRADERS, safety-first values, and commitment to legal fireworks dispatch across India."
         canonical="/about"
-        keywords="about crackers kingdom, sivakasi fireworks shop, licensed fireworks seller, legal fireworks dispatch"
+        keywords="about crackers kingdom, sivakasi fireworks shop, licensed fireworks seller, legal fireworks dispatch, crackers kingdom sivakasi, crackerskingdom about"
         ogImage="/og/about-og.svg?v=2"
         structuredData={aboutStructuredData}
       />

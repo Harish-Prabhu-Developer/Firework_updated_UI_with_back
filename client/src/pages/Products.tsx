@@ -26,6 +26,7 @@ import LegalDialog from "@/components/LegalDialog";
 import headerBg from "@/assets/header_estimate_bg.png";
 import heroBanner from "@/assets/hero-banner.jpg";
 import rockets from "@/assets/rockets.jpg";
+import defaultLogo from "@/assets/logo.png";
 import { useProducts } from "@/hooks/useProducts";
 import { useShopSettings } from "@/lib/businessInfo";
 
@@ -33,15 +34,55 @@ import { useShopSettings } from "@/lib/businessInfo";
 const formatCurrency = (n: number) =>
   `₹${n.toLocaleString("en-IN")}`;
 
-const productsStructuredData = {
-  "@context": "https://schema.org",
-  "@type": "CollectionPage",
-  name: "Fireworks Price List and Estimate Form",
-  description:
-    "Browse our Sivakasi fireworks price list, add quantities, and submit your estimate form online. Get a confirmation call within 2 hours.",
-  url: "https://crackerskingdom.in/products",
-  inLanguage: "en-IN",
-};
+const productsStructuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Crackers Kingdom — Fireworks Price List and Estimate Form",
+    description:
+      "Browse Crackers Kingdom's Sivakasi fireworks price list at crackerskingdom.in. Add quantities and submit your estimate form online. Get a confirmation call within 2 hours.",
+    url: "https://crackerskingdom.in/products",
+    inLanguage: "en-IN",
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": "https://crackerskingdom.in/#website",
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "OfferCatalog",
+    name: "Crackers Kingdom Sivakasi Fireworks Catalog",
+    description: "Complete price list of premium Sivakasi fireworks available at Crackers Kingdom.",
+    url: "https://crackerskingdom.in/products",
+    numberOfItems: "200+",
+    itemListElement: [
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Product",
+          name: "Sivakasi Sparklers",
+          category: "Sparklers",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Product",
+          name: "Flower Pots",
+          category: "Flower Pots",
+        },
+      },
+      {
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Product",
+          name: "Sky Shots & Rockets",
+          category: "Aerial Fireworks",
+        },
+      },
+    ],
+  },
+];
 
 // -- Component ----------------------------------------------------------
 const Products = () => {
@@ -67,7 +108,7 @@ const Products = () => {
   const { categories, isLoading, error } = useProducts();
 
   const getImageUrl = (img?: string) => {
-    if (!img) return rockets;
+    if (!img) return defaultLogo;
     if (img.startsWith("http")) return img;
     const cleanPath = img.replace(/\\/g, '/').replace(/^\//, '');
     return `${API_BASE_URL}/${cleanPath}`;
@@ -222,10 +263,10 @@ const Products = () => {
     <div>
       <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
       <SEO
-        title="Fireworks Price List and Estimate Form"
-        description="Browse our Sivakasi fireworks price list, add quantities, and submit your estimate form online. Get a confirmation call within 2 hours."
+        title="Crackers Kingdom — Fireworks Price List & Estimate Form"
+        description="Browse Crackers Kingdom's Sivakasi fireworks price list at crackerskingdom.in. Add quantities, submit your estimate form online, and get a confirmation call within 2 hours."
         canonical="/products"
-        keywords="fireworks price list, crackers estimate form, sivakasi crackers rates, diwali crackers online estimate"
+        keywords="fireworks price list, crackers estimate form, sivakasi crackers rates, diwali crackers online estimate, crackers kingdom price list, buy crackers sivakasi"
         ogImage="/og/products-og.svg?v=2"
         structuredData={productsStructuredData}
       />
@@ -581,7 +622,7 @@ const Products = () => {
                                       onClick={() => setSelectedImage({ url: getImageUrl(product.img), name: product.name })}
                                       className="w-6 h-6 md:w-14 md:h-14 rounded md:rounded-lg overflow-hidden border border-border/50 shadow-sm bg-secondary cursor-pointer"
                                     >
-                                      <img src={getImageUrl(product.img)} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
+                                      <img src={getImageUrl(product.img)} alt={product.name} loading="lazy" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = defaultLogo; }} />
                                     </motion.div>
                                   </td>
                                   <td className="px-0.5 md:px-4 py-3 md:py-4 font-bold text-foreground text-[9px] md:text-sm min-w-[65px] wrap-break-word leading-tight whitespace-normal">
@@ -648,7 +689,7 @@ const Products = () => {
                                   onClick={() => setSelectedImage({ url: getImageUrl(product.img), name: product.name })}
                                   className="w-20 h-20 md:w-28 md:h-28 bg-secondary rounded-2xl overflow-hidden border border-border shrink-0 shadow-inner group cursor-pointer"
                                 >
-                                  <img src={getImageUrl(product.img)} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                  <img src={getImageUrl(product.img)} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { (e.currentTarget as HTMLImageElement).src = defaultLogo; }} />
                                 </div>
                                 <div className="grow min-w-0">
                                   <h3 className="font-display font-black text-foreground text-sm md:text-xl truncate uppercase tracking-tight">{product.name}</h3>
@@ -729,7 +770,7 @@ const Products = () => {
                   <motion.div initial={{ scale: 0.8, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className="bg-card rounded-2xl shadow-2xl relative max-w-2xl w-full p-4 md:p-8 flex flex-col items-center">
                     <button onClick={() => setSelectedImage(null)} className="absolute top-2 right-2 md:top-4 md:right-4 p-2 hover:bg-secondary rounded-full transition-colors text-muted-foreground hover:text-foreground"><X className="w-6 h-6" /></button>
                     <div className="w-full aspect-square md:aspect-auto rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-border/50">
-                      <img src={selectedImage.url} alt={selectedImage.name} loading="lazy" className="w-full h-full max-h-[70vh] object-contain bg-card" />
+                      <img src={selectedImage.url} alt={selectedImage.name} loading="lazy" className="w-full h-full max-h-[70vh] object-contain bg-card" onError={(e) => { (e.currentTarget as HTMLImageElement).src = defaultLogo; }} />
                     </div>
                     <h3 className="mt-4 md:mt-6 text-lg md:text-2xl font-black text-foreground uppercase tracking-widest text-center">{selectedImage.name}</h3>
                   </motion.div>

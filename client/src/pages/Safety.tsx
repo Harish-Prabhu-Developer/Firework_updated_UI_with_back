@@ -85,23 +85,59 @@ const doNots = [
   "Never dispose of fireworks without soaking them in water first.",
 ];
 
-const safetyStructuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebPage",
-  name: "Fireworks Safety Tips and Guidelines",
-  description:
-    "Read essential fireworks safety tips from Crackers Kingdom. Follow safe handling guidelines for Diwali and all festive celebrations.",
-  url: "https://crackerskingdom.in/safety",
-  inLanguage: "en-IN",
-};
+const safetyStructuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Crackers Kingdom — Fireworks Safety Tips and Guidelines",
+    description:
+      "Read essential fireworks safety tips from Crackers Kingdom (crackerskingdom.in). Follow safe handling guidelines for Diwali and all festive celebrations.",
+    url: "https://crackerskingdom.in/safety",
+    inLanguage: "en-IN",
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": "https://crackerskingdom.in/#website",
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "What safety precautions should I follow while bursting crackers?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Always maintain at least 5 meters distance from lit fireworks, keep water nearby, wear cotton clothing, burst crackers in open areas, and supervise children at all times. Buy only licensed crackers from trusted sellers like Crackers Kingdom.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Are Crackers Kingdom's fireworks safe and certified?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes. All fireworks sold by Crackers Kingdom are sourced from licensed Sivakasi manufacturers and comply with government safety standards. We operate under M/S NANDHINI TRADERS with a valid license.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What should I do if a firework doesn't ignite?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Never lean over a firework to inspect it after lighting. Wait at least 15 minutes, then soak the firework in water before disposing of it safely.",
+        },
+      },
+    ],
+  },
+];
 
 const Safety = () => (
   <div>
     <SEO
-      title="Fireworks Safety Tips and Guidelines"
-      description="Read essential fireworks safety tips from Crackers Kingdom. Follow safe handling guidelines for Diwali and all festive celebrations."
+      title="Crackers Kingdom — Fireworks Safety Tips & Guidelines"
+      description="Read essential fireworks safety tips from Crackers Kingdom (crackerskingdom.in). Follow safe handling guidelines for Diwali, weddings, and all festive celebrations."
       canonical="/safety"
-      keywords="fireworks safety tips, diwali safety guide, safe crackers usage, fireworks precautions"
+      keywords="fireworks safety tips, diwali safety guide, safe crackers usage, fireworks precautions, crackers kingdom safety, how to burst crackers safely"
       ogImage="/og/safety-og.svg?v=2"
       structuredData={safetyStructuredData}
     />

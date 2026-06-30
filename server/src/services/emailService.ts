@@ -1,5 +1,10 @@
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { sendEmail } from '../utils/mailer.js';
 import { OrderReceivedTemplate } from '../templates/orderReceived.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface OrderEmailData {
     orderNumber: string;
@@ -7,6 +12,8 @@ export interface OrderEmailData {
     customerPhone: string;
     customerEmail: string;
     subtotal: string;
+    discountAmount?: string;
+    discountPercentage?: number;
     total: string;
     items: Array<{
         productName: string;
@@ -15,7 +22,6 @@ export interface OrderEmailData {
         unitPrice: number | string;
         totalPrice: number | string;
     }>;
-    logoUrl?: string;
 }
 
 export interface EmailAttachment {
@@ -36,7 +42,7 @@ export const sendOrderReceivedEmail = async (
         return false;
     }
 
-    const html = OrderReceivedTemplate(data);
+    const html = OrderReceivedTemplate({ ...data });
 
     return sendEmail(recipient, `Order Received - ${data.orderNumber}`, html, attachments);
 };
