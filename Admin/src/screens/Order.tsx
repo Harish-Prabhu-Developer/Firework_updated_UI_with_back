@@ -35,7 +35,7 @@ interface Order {
   taxAmount?: string;
   status: 'ESTIMATE_SUBMITTED' | 'PENDING_VERIFICATION' | 'REJECTED' | 'CONFIRMED' | 'READY_FOR_DISPATCH' | 'DISPATCHED' | 'DELIVERED' | 'converted';
   paymentMethod: 'cash' | 'upi' | 'card';
-  notes?: string; 
+  notes?: string;
   rejectionReason?: string;
   transportName?: string;
   lrNumber?: string;
@@ -263,7 +263,7 @@ export default function Orders() {
           <PermissionGuard module="Orders" action="Update">
             <TouchableOpacity onPress={() => { setUpdateStatusOrder(o); setUpdateStatusForm({ status: o.status, rejectionReason: o.rejectionReason || '', transportName: o.transportName || '', lrNumber: o.lrNumber || '', vehicleNumber: o.vehicleNumber || '' }); }} className="w-8 h-8 rounded-lg bg-orange-500/10 items-center justify-center"><Edit2 size={14} color="#f97316" /></TouchableOpacity>
           </PermissionGuard>
-          {o.status !== 'converted' && (
+          {/* {o.status !== 'converted' && (
             <PermissionGuard module="Invoices" action="Create">
               <TouchableOpacity
                 onPress={() => navigation.navigate('Billing', {
@@ -281,7 +281,7 @@ export default function Orders() {
                 <Receipt size={14} color={colors.success} />
               </TouchableOpacity>
             </PermissionGuard>
-          )}
+          )} */}
           <PermissionGuard module="Orders" action="Delete">
             <TouchableOpacity onPress={() => setDeleteId(o.id)} className="w-8 h-8 rounded-lg bg-destructive/10 items-center justify-center"><Trash2 size={14} color={colors.destructive} /></TouchableOpacity>
           </PermissionGuard>
@@ -346,7 +346,7 @@ export default function Orders() {
         <PermissionGuard module="Orders" action="Update">
           <TouchableOpacity onPress={() => { setUpdateStatusOrder(o); setUpdateStatusForm({ status: o.status, rejectionReason: o.rejectionReason || '', transportName: o.transportName || '', lrNumber: o.lrNumber || '', vehicleNumber: o.vehicleNumber || '' }); }} className="flex-1 min-w-[70px] py-2 flex-row items-center justify-center gap-1.5 border-r border-border/40"><Edit2 size={13} color="#f97316" /><Text className="text-xs font-bold text-orange-500" style={{ fontFamily: Fonts.body }}>Status</Text></TouchableOpacity>
         </PermissionGuard>
-        {o.status !== 'converted' && (
+        {/* {o.status !== 'converted' && (
           <PermissionGuard module="Invoices" action="Create">
             <TouchableOpacity
               onPress={() => navigation.navigate('Billing', {
@@ -365,7 +365,7 @@ export default function Orders() {
               <Text className="text-xs font-bold text-success" style={{ fontFamily: Fonts.body }}>Invoice</Text>
             </TouchableOpacity>
           </PermissionGuard>
-        )}
+        )} */}
         <PermissionGuard module="Orders" action="Delete">
           <TouchableOpacity onPress={() => setDeleteId(o.id)} className="flex-1 min-w-[70px] py-2 flex-row items-center justify-center gap-1.5"><Trash2 size={13} color={colors.destructive} /><Text className="text-xs font-bold text-destructive" style={{ fontFamily: Fonts.body }}>Delete</Text></TouchableOpacity>
         </PermissionGuard>

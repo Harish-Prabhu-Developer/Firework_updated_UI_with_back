@@ -181,7 +181,11 @@ export default function BulkUploadDialog({ open, onClose }: Props) {
 
   const catsQuery = useQuery<any[]>({
     queryKey: ['categories-list'],
-    queryFn: async () => { const { data } = await api.get('/categories?limit=999999&isActive=true'); return data.data ?? []; },
+    queryFn: async () => {
+      const { data: res } = await api.get('/categories?limit=999999&isActive=true');
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return list ?? [];
+    },
     staleTime: 0,
   });
 

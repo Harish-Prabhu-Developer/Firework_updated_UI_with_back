@@ -33,14 +33,14 @@ const STAT_CONFIG: StatConfig[] = [
   { label: 'Categories', icon: FolderTree, bg: 'bg-secondary/10', iconColor: colors.secondary, link: 'Categories', qk: 'categories' },
   { label: 'Customers', icon: Users, bg: 'bg-info/10', iconColor: colors.info, link: 'Customers', qk: 'customers' },
   { label: 'Orders', icon: ShoppingCart, bg: 'bg-warning/10', iconColor: colors.warning, link: 'Orders', qk: 'orders' },
-  { label: 'Invoices', icon: FileText, bg: 'bg-accent/10', iconColor: colors.accent, link: 'Bill History', qk: 'invoices' },
+  // { label: 'Invoices', icon: FileText, bg: 'bg-accent/10', iconColor: colors.accent, link: 'Bill History', qk: 'invoices' },
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'New Bill', screen: 'Create Bill', color: 'bg-primary' },
+  // { label: 'New Bill', screen: 'Create Bill', color: 'bg-primary' },
   { label: 'New Order', screen: 'Orders', color: 'bg-secondary' },
   { label: 'Add Product', screen: 'Products', color: 'bg-accent' },
-  { label: 'Scan QR', screen: 'QrScan', color: 'bg-info' },
+  // { label: 'Scan QR', screen: 'QrScan', color: 'bg-info' },
 ];
 
 // Dashboard data fetched via API
@@ -89,7 +89,7 @@ export const useDashboardQueries = () => {
       queryKey: [item.qk, 'stat'],
       queryFn: async () => {
         try {
-          const { data } = await api.get(`/${item.qk}?limit=1`);
+          const { data } = await api.get(`/${item.qk}?limit=999`);
           return getStatCount(data);
         } catch {
           return 0;
@@ -135,7 +135,7 @@ export default function Dashboard() {
 
       <View className="mb-6">
         <Text className="text-2xl font-black text-foreground tracking-tight" style={{ fontFamily: Fonts.display }}>Dashboard</Text>
-        <Text className="text-sm text-muted-foreground mt-1" style={{ fontFamily: Fonts.body }}>Crackers Kingdom - POS & Billing Admin</Text>
+        <Text className="text-sm text-muted-foreground mt-1" style={{ fontFamily: Fonts.body }}>Crackers Kingdom - POS Admin</Text>
       </View>
 
       <View className="flex-row flex-wrap gap-3 mb-8">

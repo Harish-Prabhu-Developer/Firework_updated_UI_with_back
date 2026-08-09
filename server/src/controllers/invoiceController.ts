@@ -10,7 +10,7 @@ import { generateInvoiceNumber } from '../utils/helpers.js';
 import { decrypt, encrypt } from '../utils/crypto.js';
 import { generatePDFFromHTML } from '../services/pdfService.js';
 
-import { renderInvoiceHtml } from '../templates/InvoiceTemplate.js'
+import { renderInvoiceHtml } from '../templates/invoiceTemplate.js'
 import dotenv from "dotenv";
 import {
     bodyToStringArray,

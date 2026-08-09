@@ -66,12 +66,12 @@ const MENU_ITEMS: MenuItem[] = [
     route: 'Orders',
     module: 'Orders',
   },
-  {
-    name: 'Billing',
-    icon: Receipt,
-    route: 'Billing',
-    module: 'Invoices',         // matches modules.name seeded as "Invoices"
-  },
+  //{
+   // name: 'Billing',
+   // icon: Receipt,
+    //route: 'Billing',
+  //  module: 'Invoices',         // matches modules.name seeded as "Invoices"
+//  },
   {
     name: 'Customers',
     icon: User,

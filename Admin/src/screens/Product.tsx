@@ -165,7 +165,11 @@ export const useProductQueries = () => {
   });
   const catsQuery = useQuery<Category[]>({
     queryKey: ['categories-list'],
-    queryFn: async () => { const { data } = await api.get('/categories?limit=999999&isActive=true'); return data.data ?? []; }
+    queryFn: async () => {
+      const { data: res } = await api.get('/categories?limit=999999&isActive=true');
+      const list = [res, res?.data, res?.data?.data].find(Array.isArray);
+      return (list ?? []) as Category[];
+    }
   });
 
   const saveMutation = useMutation({
